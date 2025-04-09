@@ -27,9 +27,10 @@ import {
   Globe,
   Loader
 } from 'lucide-react';
+import { StatusIcon, StatusIconWithText, getStatusCategory } from './statusIcons';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, Sector, LineChart, Line
+  PieChart, Pie, Cell, Sector, LineChart, Line, AreaChart, Area
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { rpc } from '@gi-nx/iframe-sdk';
@@ -37,7 +38,7 @@ import { lgaMapping } from '../../utils/councilLgaMapping';
 import * as turf from '@turf/turf';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { createDevelopmentLayer, removeDevelopmentLayer, getTransformedDevelopmentType } from './mapLayerUtils';
-import { developmentCategories, getDevelopmentCategory } from './developmentTypes';
+import { developmentCategories, getDevelopmentCategory, devTypesData } from './developmentTypes';
 import { RESIDENTIAL_TYPES } from './residentialTypes';
 import InfoTooltip from './InfoTooltip';
 import Autocomplete from '../Autocomplete';
@@ -306,9 +307,17 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
     };
   }, [isOpen, selectedFeatures, hasLoadedData]);
 
-  // Helper function to check if a development type is residential
+  // Helper function to check if a development type is residential based on the RESIDENTIAL_TYPES set
   const isResidentialType = (type) => {
     return RESIDENTIAL_TYPES.has(type);
+  };
+  
+  // Helper function to check if a development type belongs to the "Residential Types" category in developmentTypes.js
+  const isInResidentialTypesCategory = (typeName) => {
+    return devTypesData.find(
+      category => category.category === 'Residential Types' && 
+      category.types.some(t => t.newtype === typeName || t.oldtype === typeName)
+    ) !== undefined;
   };
 
   // Helper function to calculate summary statistics for the development applications
@@ -942,18 +951,18 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
             className={`bg-white ${fullscreen ? 'w-full h-full' : 'rounded-lg shadow-xl w-full max-w-6xl h-[90vh]'} flex flex-col`}
           >
             <div className="flex items-center justify-between p-4 border-b">
-              <div className="flex flex-col">
-                <div className="flex items-center">
-                  <div className="mr-4">
-                    <AnimatedDevLogo />
-                  </div>
-                  <h2 className="text-xl font-semibold">Development Applications</h2>
+              <div className="flex items-center">
+                <div className="mr-4">
+                  <AnimatedDevLogo />
                 </div>
-                {!loading && !error && featureProperties && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    Data as of: {fetchDate ? formatDateLong(fetchDate) : 'Unknown'}
-                  </p>
-                )}
+                <div>
+                  <h2 className="text-xl font-semibold">Development Applications</h2>
+                  {!loading && !error && featureProperties && (
+                    <p className="text-sm text-gray-500">
+                      Data as of: {fetchDate ? formatDateLong(fetchDate) : 'Unknown'}
+                    </p>
+                  )}
+                </div>
               </div>
               {/* Close button removed */}
             </div>
@@ -962,7 +971,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
             <div className="px-4 py-3 bg-gray-50 border-b flex items-center">
               <div className="flex-1 flex items-center gap-3 flex-wrap">
                 <div className="text-sm font-medium text-gray-700">LGA:</div>
-                <div className="relative flex-1 max-w-md">
+                <div className="relative flex-1">
                   <div className="relative">
                     <Autocomplete
                       value={selectedLga}
@@ -1285,7 +1294,10 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                                     }}
                                     className={`flex items-center justify-between px-3 py-2 text-sm rounded cursor-pointer ${filters.status === status ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
                                   >
-                                    <span>{status}</span>
+                                    <div className="flex items-center gap-2">
+                                      <StatusIcon status={status} size={14} />
+                                      <span>{status}</span>
+                                    </div>
                                     <span className="text-gray-500 text-xs">{summaryData.byStatus[status]}</span>
                                   </div>
                                 ))
@@ -1297,7 +1309,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                       )}
                     </div>
                     
-                    {/* Add Application Type Filter */}
+                    {/* Application Type Filter */}
                     <div className="relative">
                       <div 
                         onClick={() => toggleFilterCard('applicationType')}
@@ -1830,8 +1842,31 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                               <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
                                   data={(() => {
-                                    // Convert residential types to array and sort by count
-                                    return Object.entries(summaryData.byResidentialType)
+                                    // Group data by residential categories and "other"
+                                    const categorizedData = {};
+                                    let otherCount = 0;
+                                    
+                                    // Process each residential type
+                                    Object.entries(summaryData.byResidentialType).forEach(([type, count]) => {
+                                      // Use the helper function to check if this type is in the 'Residential Types' category
+                                      if (isInResidentialTypesCategory(type)) {
+                                        // Keep residential category types as explicit entries
+                                        categorizedData[type] = count;
+                                      } else {
+                                        // Add to "other" category - these are dwelling types that aren't
+                                        // in the 'Residential Types' category in developmentTypes.js
+                                        // but are still considered residential (in RESIDENTIAL_TYPES set)
+                                        otherCount += count;
+                                      }
+                                    });
+                                    
+                                    // Add the "other" category if it has any values
+                                    if (otherCount > 0) {
+                                      categorizedData['Other'] = otherCount;
+                                    }
+                                    
+                                    // Convert to array and sort by count
+                                    return Object.entries(categorizedData)
                                       .map(([type, count]) => ({
                                         type: type.length > 25 ? type.substring(0, 23) + '...' : type,
                                         count,
@@ -1882,59 +1917,106 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                         </>
                       )}
                       
-                      {/* Applications over Time */}
+                      {/* Dwellings over Time */}
                       {activeChartTab === 'Applications over Time' && (
                         <>
                           <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
                             <BarChartIcon className="w-4 h-4 mr-1 text-blue-500" />
-                            Applications over Time
+                            Dwellings over Time by Type
                           </h3>
                           <div className="h-80">
                             {developmentData.length > 0 ? (
                               <ResponsiveContainer width="100%" height="100%">
-                                <LineChart
+                                <AreaChart
                                   data={(() => {
-                                    // Get unique development categories
-                                    const categories = {};
+                                    // Get dwelling types for residential applications
+                                    // We'll use the same categories as the "Residential Dwellings by Type" chart
+                                    const dwellingTypes = {};
+                                    // First collect all residential types from applications with dwellings
                                     developmentData.forEach(app => {
-                                      if (app.DevelopmentType && Array.isArray(app.DevelopmentType)) {
-                                        const category = app.DevelopmentType[0]?.DevelopmentCategory || 'Other';
-                                        if (!categories[category]) {
-                                          categories[category] = true;
+                                      if (app.DevelopmentType && Array.isArray(app.DevelopmentType) && 
+                                          app.NumberOfNewDwellings && app.NumberOfNewDwellings > 0) {
+                                        // Check if it's residential
+                                        const isResidential = app.DevelopmentType.some(type => 
+                                          isResidentialType(type.DevelopmentType)
+                                        );
+                                        
+                                        if (isResidential) {
+                                          const transformedType = getTransformedDevelopmentType(app.DevelopmentType);
+                                          // Check if this type belongs to the "Residential Types" category
+                                          if (isInResidentialTypesCategory(transformedType)) {
+                                            dwellingTypes[transformedType] = true;
+                                          } else {
+                                            dwellingTypes['Other'] = true;
+                                          }
                                         }
                                       }
                                     });
                                     
+                                    // If we don't have any residential types, add some default ones
+                                    if (Object.keys(dwellingTypes).length === 0) {
+                                      // Get the types from the Residential Types category
+                                      const residentialCategory = devTypesData.find(cat => cat.category === 'Residential Types');
+                                      if (residentialCategory) {
+                                        residentialCategory.types.forEach(type => {
+                                          dwellingTypes[type.newtype || type.oldtype] = true;
+                                        });
+                                      }
+                                      dwellingTypes['Other'] = true;
+                                    }
+                                    
                                     // Get all dates from the data and sort them
                                     const dates = [...new Set(developmentData
-                                      .filter(app => app.LodgementDate)
+                                      .filter(app => app.LodgementDate && app.NumberOfNewDwellings && app.NumberOfNewDwellings > 0)
                                       .map(app => app.LodgementDate.substring(0, 7))) // YYYY-MM format
                                     ].sort();
                                     
                                     // Initialize data structure for each date
                                     const timeData = dates.map(date => {
                                       const dataPoint = { date };
-                                      Object.keys(categories).forEach(category => {
-                                        dataPoint[category] = 0;
+                                      Object.keys(dwellingTypes).forEach(type => {
+                                        dataPoint[type] = 0;
                                       });
                                       return dataPoint;
                                     });
                                     
                                     // Fill in the cumulative counts
-                                    Object.keys(categories).forEach(category => {
-                                      let cumulativeCount = 0;
+                                    timeData.forEach((dataPoint, i) => {
+                                      // For each date, sum the dwellings by type up to this point in time
+                                      const appsUpToThisDate = developmentData.filter(app => 
+                                        app.LodgementDate && 
+                                        app.LodgementDate.substring(0, 7) <= dataPoint.date &&
+                                        app.NumberOfNewDwellings && 
+                                        app.NumberOfNewDwellings > 0
+                                      );
                                       
-                                      timeData.forEach((dataPoint, i) => {
-                                        // Count applications of this category for this month or before
-                                        const monthlyCount = developmentData.filter(app => {
-                                          const appLodgementMonth = app.LodgementDate?.substring(0, 7);
-                                          const appCategory = app.DevelopmentType?.[0]?.DevelopmentCategory || 'Other';
-                                          return appLodgementMonth && appLodgementMonth <= dataPoint.date && appCategory === category;
-                                        }).length;
-                                        
-                                        cumulativeCount = monthlyCount;
-                                        dataPoint[category] = cumulativeCount;
+                                      // Group dwellings by type
+                                      appsUpToThisDate.forEach(app => {
+                                        if (app.DevelopmentType && Array.isArray(app.DevelopmentType)) {
+                                          const isResidential = app.DevelopmentType.some(type => 
+                                            isResidentialType(type.DevelopmentType)
+                                          );
+                                          
+                                          if (isResidential) {
+                                            const transformedType = getTransformedDevelopmentType(app.DevelopmentType);
+                                            const dwellingCount = app.NumberOfNewDwellings;
+                                            
+                                            // Check if it belongs to Residential Types category
+                                            if (isInResidentialTypesCategory(transformedType)) {
+                                              dataPoint[transformedType] = (dataPoint[transformedType] || 0) + dwellingCount;
+                                            } else {
+                                              dataPoint['Other'] = (dataPoint['Other'] || 0) + dwellingCount;
+                                            }
+                                          }
+                                        }
                                       });
+                                      
+                                      // Add previous month's counts to make it cumulative
+                                      if (i > 0) {
+                                        Object.keys(dwellingTypes).forEach(type => {
+                                          dataPoint[type] += timeData[i-1][type] || 0;
+                                        });
+                                      }
                                     });
                                     
                                     // Format dates for display
@@ -1958,7 +2040,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                                     tick={{ fontSize: 10 }}
                                   />
                                   <Tooltip 
-                                    formatter={(value, name) => [`${value} applications`, name]}
+                                    formatter={(value, name) => [`${value} dwellings`, name]}
                                     contentStyle={{ 
                                       backgroundColor: 'white', 
                                       borderRadius: '8px',
@@ -1966,28 +2048,55 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                                       padding: '8px'
                                     }}
                                   />
+                                  <Legend />
                                   {Object.keys((() => {
-                                    const categories = {};
+                                    // Get dwelling types for residential applications
+                                    const dwellingTypes = {};
+                                    // First collect all residential types from applications with dwellings
                                     developmentData.forEach(app => {
-                                      if (app.DevelopmentType && Array.isArray(app.DevelopmentType)) {
-                                        const category = app.DevelopmentType[0]?.DevelopmentCategory || 'Other';
-                                        if (!categories[category]) {
-                                          categories[category] = true;
+                                      if (app.DevelopmentType && Array.isArray(app.DevelopmentType) && 
+                                          app.NumberOfNewDwellings && app.NumberOfNewDwellings > 0) {
+                                        // Check if it's residential
+                                        const isResidential = app.DevelopmentType.some(type => 
+                                          isResidentialType(type.DevelopmentType)
+                                        );
+                                        
+                                        if (isResidential) {
+                                          const transformedType = getTransformedDevelopmentType(app.DevelopmentType);
+                                          // Check if this type belongs to the "Residential Types" category
+                                          if (isInResidentialTypesCategory(transformedType)) {
+                                            dwellingTypes[transformedType] = true;
+                                          } else {
+                                            dwellingTypes['Other'] = true;
+                                          }
                                         }
                                       }
                                     });
-                                    return categories;
-                                  })()).map((category, index) => (
-                                    <Line 
-                                      key={category}
+                                    
+                                    // If we don't have any residential types, add some default ones
+                                    if (Object.keys(dwellingTypes).length === 0) {
+                                      // Get the types from the Residential Types category
+                                      const residentialCategory = devTypesData.find(cat => cat.category === 'Residential Types');
+                                      if (residentialCategory) {
+                                        residentialCategory.types.forEach(type => {
+                                          dwellingTypes[type.newtype || type.oldtype] = true;
+                                        });
+                                      }
+                                      dwellingTypes['Other'] = true;
+                                    }
+                                    
+                                    return dwellingTypes;
+                                  })()).map((type, index) => (
+                                    <Area 
+                                      key={type}
                                       type="monotone"
-                                      dataKey={category}
-                                      stroke={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'][index % 5]}
-                                      activeDot={{ r: 8 }}
-                                      strokeWidth={2}
+                                      dataKey={type}
+                                      stackId="1"
+                                      fill={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'][index % 6]}
+                                      stroke={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'][index % 6]}
                                     />
                                   ))}
-                                </LineChart>
+                                </AreaChart>
                               </ResponsiveContainer>
                             ) : (
                               <div className="h-full flex items-center justify-center text-gray-500">
@@ -2151,12 +2260,12 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                       <thead className="bg-gray-50">
                         <tr>
                           <th 
-                            className="sticky top-0 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-48 bg-gray-50 z-10 shadow-sm"
+                            className="sticky top-0 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-36 bg-gray-50 z-10 shadow-sm"
                             onClick={() => toggleSort('address')}
                           >
-                            <div className="flex items-center space-x-1">
-                              <MapPin className="w-4 h-4 text-gray-400" />
-                              <span>Address</span>
+                            <div className="flex items-center space-x-1 overflow-hidden">
+                              <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                              <span className="truncate">Address</span>
                               {sortField === 'address' && (
                                 <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
                               )}
@@ -2166,9 +2275,9 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             className="sticky top-0 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-36 bg-gray-50 z-10 shadow-sm"
                             onClick={() => toggleSort('type')}
                           >
-                            <div className="flex items-center space-x-1">
-                              <Building className="w-4 h-4 text-gray-400" />
-                              <span>Development Type</span>
+                            <div className="flex items-center space-x-1 overflow-hidden">
+                              <Building className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                              <span className="truncate">Development Type</span>
                               {sortField === 'type' && (
                                 <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
                               )}
@@ -2245,8 +2354,13 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             className="cursor-pointer hover:bg-blue-50 transition-colors"
                           >
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-normal text-gray-700">
-                              <div className="truncate max-w-[250px]" title={application.Location?.[0]?.FullAddress}>
-                                {application.Location?.[0]?.FullAddress}
+                              <div className="flex flex-col" title={application.Location?.[0]?.FullAddress}>
+                                <div className="truncate max-w-[180px]">
+                                  {application.Location?.[0]?.StreetNumber1} {application.Location?.[0]?.StreetName} {application.Location?.[0]?.StreetType}
+                                </div>
+                                <div className="text-xs text-gray-400 truncate max-w-[180px]">
+                                  {application.Location?.[0]?.Suburb} {application.Location?.[0]?.Postcode}
+                                </div>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -2266,7 +2380,19 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{application.ApplicationStatus}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <div className="flex items-center gap-1.5 relative group">
+                                <StatusIcon status={application.ApplicationStatus} size={14} />
+                                <span className="text-xs text-gray-500">
+                                  {application.ApplicationStatus.length > 10 
+                                    ? `${application.ApplicationStatus.substring(0, 10)}...` 
+                                    : application.ApplicationStatus}
+                                </span>
+                                <div className="absolute left-0 transform -translate-y-2 bottom-full bg-black text-white text-xs rounded-md px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none">
+                                  {application.ApplicationStatus}
+                                </div>
+                              </div>
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getAbbreviatedAppType(application.ApplicationType)}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatCostShort(application.CostOfDevelopment)}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{application.NumberOfNewDwellings || 0}</td>
@@ -2296,4 +2422,4 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
   );
 };
 
-export default DevelopmentModal; 
+export default DevelopmentModal;
