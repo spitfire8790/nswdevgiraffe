@@ -268,12 +268,8 @@ export const createDevelopmentLayer = async (
               ]
             },
             properties: {
-              id: f.properties.id || '',
-              address: f.properties.address || '',
+              Address: f.properties.Address || '',
               status: f.properties.status || '',
-              color: f.properties.color || '#666666',
-              outlineColor: f.properties.outlineColor || '#666666',
-              fillColor: f.properties.fillColor || '#666666',
               isResidential: !!f.properties.isResidential,
               "Clean Development Type": f.properties["Clean Development Type"] || f.properties.developmentType || 'Unknown',
               "Detailed Development Type": f.properties["Detailed Development Type"] || '',
@@ -287,7 +283,7 @@ export const createDevelopmentLayer = async (
               Status: f.properties.Status || '',
               "EPI Variation": f.properties["EPI Variation"] || '',
               Subdivision: f.properties.Subdivision || '',
-              Address: f.properties.Address || '',
+
               Lots: f.properties.Lots || '',
               Category: f.properties.Category || 'Miscellaneous and Administrative'
             }

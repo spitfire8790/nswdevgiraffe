@@ -950,7 +950,8 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
             exit={{ opacity: 0, scale: fullscreen ? 1 : 0.95 }}
             className={`bg-white ${fullscreen ? 'w-full h-full' : 'rounded-lg shadow-xl w-full max-w-6xl h-[90vh]'} flex flex-col`}
           >
-            <div className="flex items-center justify-between p-4 border-b">
+            {/* Fixed header with logo and title */}
+            <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
               <div className="flex items-center">
                 <div className="mr-4">
                   <AnimatedDevLogo />
@@ -967,8 +968,8 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
               {/* Close button removed */}
             </div>
 
-            {/* LGA Selector */}
-            <div className="px-4 py-3 bg-gray-50 border-b flex items-center">
+            {/* LGA Selector - also fixed */}
+            <div className="px-4 py-3 bg-gray-50 border-b flex items-center sticky top-[73px] z-10">
               <div className="flex-1 flex items-center gap-3 flex-wrap">
                 <div className="text-sm font-medium text-gray-700">LGA:</div>
                 <div className="relative flex-1">
@@ -1035,9 +1036,11 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
               </div>
             </div>
 
+            {/* Scrollable content area */}
+            <div className="flex-1 overflow-auto">
             {/* Loading state */}
             {loading ? (
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex items-center justify-center py-20">
                 <div className="text-center">
                   <Loader2 className="w-10 h-10 mb-4 mx-auto animate-spin text-blue-600" />
                   <p className="text-gray-600 mb-2">Loading development applications...</p>
@@ -1060,7 +1063,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                 </div>
               </div>
             ) : error && hasLoadedData ? (
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex items-center justify-center py-20">
                 <div className="text-center max-w-md mx-auto p-6 bg-red-50 rounded-lg">
                   <div className="text-red-600 mb-2">
                     <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1072,7 +1075,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                 </div>
               </div>
             ) : !hasLoadedData ? (
-              <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-white to-gray-50">
+              <div className="flex items-center justify-center py-20 bg-gradient-to-b from-white to-gray-50">
                 <div className="w-full max-w-3xl mx-auto px-6 py-12">
                   <div className="text-center mb-8">
                     <h2 className="text-2xl font-bold text-gray-900 mb-3">NSW Development Applications</h2>
@@ -1110,7 +1113,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                 </div>
               </div>
             ) : (
-              <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="flex flex-col">
                 {/* Global filters */}
                 <div className="p-4 bg-white border-b">
                   <div className="flex items-center justify-between mb-2">
@@ -2246,21 +2249,20 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                       ) : (
                         <>
                           <MapPin className="w-4 h-4" />
-                          <span>Generate Layer</span>
+                          < span>Generate Layer</span>
                         </>
                       )}
                     </button>
                   </div>
                 </div>
 
-                {/* Table View */}
-                <div className="flex-1 relative">
-                  <div className="absolute inset-0 overflow-auto">
-                    <table className="min-w-full divide-y divide-gray-200 table-fixed" style={{ maxWidth: '1000px', tableLayout: 'fixed' }}>
-                      <thead className="bg-gray-50">
+                {/* Table View - independently scrollable with fixed header */}
+                <div className="relative">
+                  <table className="min-w-full divide-y divide-gray-200 table-fixed" style={{ maxWidth: '1000px', tableLayout: 'fixed' }}>
+                      <thead className="bg-gray-50 sticky top-0 z-10">
                         <tr>
                           <th 
-                            className="sticky top-0 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-36 bg-gray-50 z-10 shadow-sm"
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-36 bg-gray-50 shadow-sm"
                             onClick={() => toggleSort('address')}
                           >
                             <div className="flex items-center space-x-1 overflow-hidden">
@@ -2272,7 +2274,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             </div>
                           </th>
                           <th 
-                            className="sticky top-0 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-36 bg-gray-50 z-10 shadow-sm"
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-36 bg-gray-50 shadow-sm"
                             onClick={() => toggleSort('type')}
                           >
                             <div className="flex items-center space-x-1 overflow-hidden">
@@ -2284,7 +2286,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             </div>
                           </th>
                           <th 
-                            className="sticky top-0 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-28 bg-gray-50 z-10 shadow-sm"
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-28 bg-gray-50 shadow-sm"
                             onClick={() => toggleSort('status')}
                           >
                             <div className="flex items-center space-x-1">
@@ -2296,7 +2298,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             </div>
                           </th>
                           <th 
-                            className="sticky top-0 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-28 bg-gray-50 z-10 shadow-sm"
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-28 bg-gray-50 shadow-sm"
                             onClick={() => toggleSort('applicationType')}
                           >
                             <div className="flex items-center space-x-1">
@@ -2308,7 +2310,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             </div>
                           </th>
                           <th 
-                            className="group px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-20 bg-gray-50 sticky top-0 z-10 shadow-sm"
+                            className="group px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-20 bg-gray-50 shadow-sm"
                             onClick={() => toggleSort('cost')}
                           >
                             <div className="flex items-center space-x-1">
@@ -2320,7 +2322,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             </div>
                           </th>
                           <th 
-                            className="group px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-24 bg-gray-50 sticky top-0 z-10 shadow-sm"
+                            className="group px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-24 bg-gray-50 shadow-sm"
                             onClick={() => toggleSort('dwellings')}
                           >
                             <div className="flex items-center justify-center" title="Dwellings">
@@ -2331,7 +2333,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             </div>
                           </th>
                           <th 
-                            className="group px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-24 bg-gray-50 sticky top-0 z-10 shadow-sm"
+                            className="group px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-24 bg-gray-50 shadow-sm"
                             onClick={() => toggleSort('LodgementDate')}
                           >
                             <div className="flex items-center space-x-1">
@@ -2344,6 +2346,10 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                           </th>
                         </tr>
                       </thead>
+                  </table>
+                  
+                  <div className="h-[400px] overflow-auto border-t">
+                    <table className="min-w-full divide-y divide-gray-200 table-fixed" style={{ maxWidth: '1000px', tableLayout: 'fixed' }}>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {getSortedFilteredApplications().map((application) => (
                           <tr 
@@ -2411,6 +2417,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                 </div>
               </div>
             )}
+            </div>
           </motion.div>
         </div>
       )}
