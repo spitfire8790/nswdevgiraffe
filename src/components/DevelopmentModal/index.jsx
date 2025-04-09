@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   X, 
   FileSpreadsheet,
@@ -24,11 +24,12 @@ import {
   Search,
   RefreshCw,
   Crosshair,
-  Globe
+  Globe,
+  Loader
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, Sector
+  PieChart, Pie, Cell, Sector, LineChart, Line
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { rpc } from '@gi-nx/iframe-sdk';
@@ -37,46 +38,16 @@ import * as turf from '@turf/turf';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { createDevelopmentLayer, removeDevelopmentLayer, getTransformedDevelopmentType } from './mapLayerUtils';
 import { developmentCategories, getDevelopmentCategory } from './developmentTypes';
+import { RESIDENTIAL_TYPES } from './residentialTypes';
 import InfoTooltip from './InfoTooltip';
 import Autocomplete from '../Autocomplete';
 import { getCouncilFromLga, getAllLgas } from '../../utils/councilLgaMapping';
 import AnimatedDevLogo from '../../animatedLogo';
 import { tooltipContent } from './tooltipContent';
+import { fetchAllDAs } from '../../utils/api/fetchDAs';
+import { deduplicateDAs } from '../../utils/api/dataCleanup';
+import { queryLgaFromCoordinates } from '../../utils/api/arcgis';
 
-// Define residential development types
-const RESIDENTIAL_TYPES = new Set([
-  'Dwelling',
-  'Dwelling house',
-  'Secondary dwelling',
-  'Dual occupancy',
-  'Dual occupancy (attached)',
-  'Dual occupancy (detached)',
-  'Residential flat building',
-  'Multi-dwelling housing',
-  'Multi-dwelling housing (terraces)',
-  'Semi-attached dwelling',
-  'Attached dwelling',
-  'Semi-detached dwelling',
-  'Shop top housing',
-  'Boarding house',
-  'Seniors housing',
-  'Group homes',
-  'Group home',
-  'Group home (permanent)',
-  'Group home (transitional)',
-  'Build-to-rent',
-  'Co-living',
-  'Co-living housing',
-  'Manufactured home',
-  'Moveable dwelling',
-  "Rural worker's dwelling",
-  'Independent living units',
-  'Manor house',
-  'Medium Density Housing',
-  'Non-standard Housing',
-  'Residential Accommodation',
-  'Manor houses'
-]);
 
 // Constants for application status colors
 const STATUS_COLORS = {
@@ -88,51 +59,6 @@ const STATUS_COLORS = {
   'default': '#666666'       // Grey
 };
 
-// New InfoModal component for deduplication information
-const InfoModal = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
-  
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Data Processing Information</h2>
-            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          
-          <div className="prose">
-            <h3>Deduplication Process</h3>
-            <p>
-              Development applications are automatically deduplicated to prevent multiple entries for the same development appearing in the table.
-            </p>
-            
-            <h4>How Deduplication Works:</h4>
-            <ol>
-              <li>Applications with the same Planning Portal Application Number (PAN) are grouped, keeping only the most recent version.</li>
-              <li>Applications without a PAN are grouped by address and cost.</li>
-              <li>When multiple application types exist for the same development (e.g., DA and MOD):
-                <ul>
-                  <li>Modification applications (MOD) are preferred over original applications (DA) when they're more recent</li>
-                  <li>Applications are further sorted by lodgement date to show the most up-to-date information</li>
-                </ul>
-              </li>
-            </ol>
-            
-            <h4>Why This Matters:</h4>
-            <p>
-              This approach ensures you see only the most relevant version of each development application, 
-              reducing clutter and providing a clearer picture of development activity in the area.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = false }) => {
   const [developmentData, setDevelopmentData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -140,6 +66,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
   const [featureProperties, setFeatureProperties] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
   const [developmentLayer, setDevelopmentLayer] = useState(null);
+  const [isGeneratingLayer, setIsGeneratingLayer] = useState(false);
   const [summaryData, setSummaryData] = useState({
     totalApplications: 0,
     byStatus: {},
@@ -149,8 +76,17 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
     totalDwellings: 0
   });
   const [totalFeatures, setTotalFeatures] = useState(0);
+  const [processedFeatures, setProcessedFeatures] = useState(0);
   const [hasLoadedData, setHasLoadedData] = useState(false);
   const [fetchDate, setFetchDate] = useState(null);
+  
+  // New state for tracking loading progress
+  const [loadingProgress, setLoadingProgress] = useState({
+    currentPage: 0,
+    totalPages: 0,
+    loadedDAs: 0,
+    totalDAs: 0
+  });
   
   // New state for LGA selector
   const [selectedLga, setSelectedLga] = useState('');
@@ -216,7 +152,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
         
         if (councilName) {
           console.log('Fetching DAs for council:', councilName);
-          const daFeatures = await fetchAllDAs(councilName);
+          const daFeatures = await fetchAllDAs(councilName, setLoadingProgress);
           
           // De-duplicate DAs based on address and value
           const dedupedDaFeatures = deduplicateDAs(daFeatures);
@@ -355,98 +291,6 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
     fetchDevelopmentData(selectedLga);
   };
 
-  // Function to deduplicate development applications
-  const deduplicateDAs = (applications) => {
-    if (!applications || applications.length === 0) return [];
-    
-    // Create a map to store the most recent version of each application by PAN
-    const uniqueApplications = new Map();
-    
-    // First, organize applications by their address to detect duplicates and modifications
-    const addressGroups = new Map();
-    
-    // Process applications to group by address
-    applications.forEach(app => {
-      const address = app.Location?.[0]?.FullAddress || '';
-      if (!address) return;
-      
-      if (!addressGroups.has(address)) {
-        addressGroups.set(address, [app]);
-      } else {
-        addressGroups.get(address).push(app);
-      }
-    });
-    
-    // Process each application
-    applications.forEach(app => {
-      const pan = app.PlanningPortalApplicationNumber;
-      
-      // Primary deduplication: Use PAN if available
-      if (pan) {
-        if (!uniqueApplications.has(pan)) {
-          uniqueApplications.set(pan, app);
-        } else {
-          // If we have a duplicate PAN, keep the most recent version based on DateLastUpdated
-          const existingApp = uniqueApplications.get(pan);
-          const existingDate = existingApp.DateLastUpdated ? new Date(existingApp.DateLastUpdated) : new Date(0);
-          const newDate = app.DateLastUpdated ? new Date(app.DateLastUpdated) : new Date(0);
-          
-          if (newDate > existingDate) {
-            uniqueApplications.set(pan, app);
-          }
-        }
-        return;
-      }
-      
-      // Secondary deduplication for apps without PAN: handle address-based grouping
-      const address = app.Location?.[0]?.FullAddress || '';
-      
-      if (!address) return;
-      
-      // Get all applications for this address
-      const addressApps = addressGroups.get(address);
-      
-      // If there's only one application for this address, use it
-      if (addressApps.length === 1) {
-        const key = `${address}`;
-        uniqueApplications.set(key, app);
-        return;
-      }
-      
-      // If there are multiple applications for this address, we need a smart deduplication strategy
-      // Create a composite key using address and cost (ignoring applicationType)
-      const compositeKey = `${address}_${app.CostOfDevelopment || 0}`;
-      
-      if (!uniqueApplications.has(compositeKey)) {
-        uniqueApplications.set(compositeKey, app);
-      } else {
-        // For modifications, prefer to keep the original DA unless the MOD is more recent
-        const existingApp = uniqueApplications.get(compositeKey);
-        
-        // Check if either is a modification
-        const isExistingMod = existingApp.ApplicationType === 'MOD';
-        const isNewMod = app.ApplicationType === 'MOD';
-        
-        // If existing is DA and new is MOD, generally prefer the MOD as it's an update
-        if (!isExistingMod && isNewMod) {
-          uniqueApplications.set(compositeKey, app);
-          return;
-        }
-        
-        // If both are DA or both are MOD, compare by lodgement date
-        const existingDate = existingApp.LodgementDate ? new Date(existingApp.LodgementDate) : new Date(0);
-        const newDate = app.LodgementDate ? new Date(app.LodgementDate) : new Date(0);
-        
-        if (newDate > existingDate) {
-          uniqueApplications.set(compositeKey, app);
-        }
-      }
-    });
-    
-    // Convert the map values back to an array
-    return Array.from(uniqueApplications.values());
-  };
-
   // Only fetch data when modal is first opened
   useEffect(() => {
     if (isOpen && !hasLoadedData && selectedFeatures && selectedFeatures.length > 0 && selectedFeatures[0]?.properties?.copiedFrom?.site_suitability__LGA) {
@@ -461,159 +305,6 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
         }
     };
   }, [isOpen, selectedFeatures, hasLoadedData]);
-
-  // Helper function to fetch all DA pages
-  async function fetchAllDAs(councilName) {
-    const allDAs = [];
-    let pageNumber = 1;
-    const pageSize = 2000; // Increased page size for faster retrieval
-    
-    try {
-      console.log(`Fetching DAs for council: ${councilName}`);
-      
-      const API_BASE_URL = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:3000'
-        : 'https://proxy-server.jameswilliamstrutt.workers.dev';
-
-      // Format the filters object according to the API requirements
-      const apiFilters = {
-        CouncilName: [councilName],
-        // Removed CostOfDevelopmentFrom filter as requested
-        LodgementDateFrom: '2020-01-01' // Fixed date as requested
-      };
-
-      console.log('Using API filters:', apiFilters);
-
-      const requestBody = {
-        url: 'https://api.apps1.nsw.gov.au/eplanning/data/v0/OnlineDA',
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'PageSize': pageSize.toString(),
-          'PageNumber': pageNumber.toString(),
-          'filters': JSON.stringify({ filters: apiFilters })
-        }
-      };
-
-      console.log('Sending API request to fetch DAs');
-      
-      try {
-        const response = await fetch(`${API_BASE_URL}${process.env.NODE_ENV === 'development' ? '/api/proxy' : ''}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Non-OK response from API:', {
-            status: response.status,
-            statusText: response.statusText,
-            errorText: errorText.substring(0, 200) // Limit error text length to avoid console spam
-          });
-          
-          throw new Error(`API responded with ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('Received API response:', {
-          totalRecords: data.TotalRecords || 0,
-          totalPages: data.TotalPages || 0,
-          applicationCount: data.Application?.length || 0
-        });
-        
-        // Log a sample response to see the structure
-        if (data?.Application?.length > 0) {
-          console.log('Sample Development Application:', JSON.stringify(data.Application[0], null, 2));
-          
-          // Log some key properties for the first few applications
-          const sampleCount = Math.min(3, data.Application.length);
-          console.log(`Sample ${sampleCount} Development Applications:`, 
-            data.Application.slice(0, sampleCount).map(app => ({
-              address: app.Location?.[0]?.FullAddress,
-              status: app.ApplicationStatus,
-              cost: app.CostOfDevelopment,
-              lodgementDate: app.LodgementDate,
-              description: app.DevelopmentDescription,
-              type: app.DevelopmentType?.[0]?.DevelopmentType || 'N/A',
-              coords: app.Location?.[0] ? [app.Location[0].X, app.Location[0].Y] : null
-            }))
-          );
-        }
-
-        if (!data || !data.Application) {
-          console.error('Invalid response format:', data);
-          throw new Error('Invalid response format from DA API');
-        }
-
-        // Add all applications from this page
-        allDAs.push(...data.Application);
-
-        // Fetch all pages as requested (no cap)
-        const maxPages = data.TotalPages || 1;
-        
-        if (maxPages > 1) {
-          console.log(`Fetching ${maxPages - 1} additional pages...`);
-          
-          // Use sequential fetching instead of Promise.all to prevent rate limiting
-          for (let page = 2; page <= maxPages; page++) {
-            console.log(`Fetching page ${page}/${maxPages}...`);
-            
-            try {
-              const pageResponse = await fetch(`${API_BASE_URL}${process.env.NODE_ENV === 'development' ? '/api/proxy' : ''}`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                  url: 'https://api.apps1.nsw.gov.au/eplanning/data/v0/OnlineDA',
-                  method: 'GET',
-                  headers: {
-                    'Accept': 'application/json',
-                    'PageSize': pageSize.toString(),
-                    'PageNumber': page.toString(),
-                    'filters': JSON.stringify({ filters: apiFilters })
-                  }
-                })
-              });
-              
-              if (!pageResponse.ok) {
-                console.warn(`Failed to fetch page ${page}, continuing with data we have`);
-                continue;
-              }
-              
-              const pageData = await pageResponse.json();
-              
-              if (pageData?.Application) {
-                allDAs.push(...pageData.Application);
-                console.log(`Added ${pageData.Application.length} applications from page ${page}`);
-              }
-              
-              // Minimal delay between requests while still avoiding rate limiting
-              await new Promise(resolve => setTimeout(resolve, 50));
-              
-            } catch (pageError) {
-              console.warn(`Error fetching page ${page}, skipping:`, pageError);
-              // Continue with the data we have
-            }
-          }
-        }
-      } catch (fetchError) {
-        console.error('Error during API fetch:', fetchError);
-        throw fetchError;
-      }
-
-      console.log(`Successfully fetched ${allDAs.length} DAs`);
-      return allDAs;
-    } catch (error) {
-      console.error('Error fetching DAs:', error);
-      throw error; // Re-throw so the UI can show error state
-    }
-  }
 
   // Helper function to check if a development type is residential
   const isResidentialType = (type) => {
@@ -1000,14 +691,47 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
   };
 
   // Handle creating GeoJSON layer
-  const handleCreateGeoJSONLayer = () => {
-    createDevelopmentLayer(
-      developmentData,
-      selectedFeatures,
-      setDevelopmentLayer,
-      setError,
-      setTotalFeatures
-    );
+  const handleCreateGeoJSONLayer = async () => {
+    // Set loading state
+    setIsGeneratingLayer(true);
+    setProcessedFeatures(0);
+    
+    try {
+      // Create a mock feature with the selected LGA if we don't have a selected feature
+      if (!selectedFeatures || selectedFeatures.length === 0) {
+        const mockFeature = {
+          type: 'Feature',
+          properties: {
+            copiedFrom: {
+              site_suitability__LGA: selectedLga
+            }
+          }
+        };
+        await createDevelopmentLayer(
+          developmentData,
+          [mockFeature],
+          setDevelopmentLayer,
+          setError,
+          setTotalFeatures,
+          setProcessedFeatures
+        );
+      } else {
+        await createDevelopmentLayer(
+          developmentData,
+          selectedFeatures,
+          setDevelopmentLayer,
+          setError,
+          setTotalFeatures,
+          setProcessedFeatures
+        );
+      }
+    } catch (error) {
+      console.error('Error generating layer:', error);
+      setError(`Error generating layer: ${error.message}`);
+    } finally {
+      // Clear loading state
+      setIsGeneratingLayer(false);
+    }
   };
 
   // Format numbers with commas
@@ -1122,72 +846,6 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
     }
   }, [isOpen, selectedFeatures, hasLoadedData]);
 
-  // Function to query the NSW Administrative Boundaries service
-  const queryLgaFromCoordinates = async (longitude, latitude) => {
-    try {
-      // Convert from WGS84 (EPSG:4326) to Web Mercator (EPSG:3857/102100)
-      // The ArcGIS REST service uses Web Mercator
-      // Simple conversion formula (approximate)
-      const x = longitude * 20037508.34 / 180;
-      const y = Math.log(Math.tan((90 + latitude) * Math.PI / 360)) / (Math.PI / 180);
-      const mercatorY = y * 20037508.34 / 180;
-      
-      // Construct the query URL for the ArcGIS REST service
-      const serviceUrl = 'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Administrative_Boundaries/MapServer/1/query';
-      const params = new URLSearchParams({
-        geometry: `${x},${mercatorY}`,
-        geometryType: 'esriGeometryPoint',
-        inSR: '102100',
-        outSR: '102100',
-        spatialRel: 'esriSpatialRelIntersects',
-        outFields: 'lganame,councilname',
-        returnGeometry: 'false',
-        f: 'json'
-      });
-      
-      // Use a proxy service to avoid CORS issues
-      const proxyUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:3000/api/proxy'
-        : 'https://proxy-server.jameswilliamstrutt.workers.dev';
-      
-      const response = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: `${serviceUrl}?${params.toString()}`,
-          method: 'GET'
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`ArcGIS REST service responded with status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(`ArcGIS REST service error: ${data.error.message || JSON.stringify(data.error)}`);
-      }
-      
-      if (!data.features || data.features.length === 0) {
-        console.log('No LGA found at these coordinates');
-        return null;
-      }
-      
-      // Return the LGA name from the first feature
-      return data.features[0].attributes.lganame;
-    } catch (error) {
-      console.error('Error querying LGA from coordinates:', error);
-      return null;
-    }
-  };
-
-  // State for project details
-  const [projectDetails, setProjectDetails] = useState(null);
-  const [isFetchingProjectDetails, setIsFetchingProjectDetails] = useState(false);
-
   // Function to fetch project details using the SDK
   const fetchProjectDetails = async () => {
     try {
@@ -1270,6 +928,9 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
 
   const [showInfoModal, setShowInfoModal] = useState(false);
 
+  // State for chart tabs
+  const [activeChartTab, setActiveChartTab] = useState('Development Values by Type');
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -1289,17 +950,12 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                   <h2 className="text-xl font-semibold">Development Applications</h2>
                 </div>
                 {!loading && !error && featureProperties && (
-                  <p className="text-sm text-gray-500 mt-1 ml-8">
+                  <p className="text-sm text-gray-500 mt-1">
                     Data as of: {fetchDate ? formatDateLong(fetchDate) : 'Unknown'}
                   </p>
                 )}
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              {/* Close button removed */}
             </div>
 
             {/* LGA Selector */}
@@ -1375,7 +1031,23 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
                   <Loader2 className="w-10 h-10 mb-4 mx-auto animate-spin text-blue-600" />
-                  <p className="text-gray-600">Loading development applications...</p>
+                  <p className="text-gray-600 mb-2">Loading development applications...</p>
+                  {loadingProgress.totalPages > 0 && (
+                    <div className="text-sm text-gray-500">
+                      <div className="mb-1">Page {loadingProgress.currentPage} of {loadingProgress.totalPages}</div>
+                      <div className="w-64 h-2 bg-gray-200 rounded-full mx-auto mb-1">
+                        <div 
+                          className="h-2 bg-blue-500 rounded-full" 
+                          style={{ width: `${(loadingProgress.currentPage / loadingProgress.totalPages) * 100}%` }}
+                        />
+                      </div>
+                      <div>
+                        {loadingProgress.totalDAs > 0 
+                          ? `Loaded ${formatNumber(loadingProgress.loadedDAs)} of ${formatNumber(loadingProgress.totalDAs)} DAs`
+                          : `Loaded ${formatNumber(loadingProgress.loadedDAs)} DAs`}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : error && hasLoadedData ? (
@@ -2041,148 +1713,398 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                   </div>
                   
                   {/* Charts Section */}
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Residential Dwelling Types Bar Chart (changed from Pie Chart) */}
-                    <div className="bg-white p-4 rounded-lg border shadow-sm">
-                      <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                        <BarChartIcon className="w-4 h-4 mr-1 text-blue-500" />
-                        Residential Dwellings by Type
-                      </h3>
-                      <div className="h-64">
-                        {Object.keys(summaryData.byResidentialType).length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={(() => {
-                                // Convert residential types to array and sort by count
-                                return Object.entries(summaryData.byResidentialType)
-                                  .map(([type, count]) => ({
-                                    type: type.length > 18 ? type.substring(0, 16) + '...' : type,
-                                    count,
-                                    fullType: type // For tooltip
-                                  }))
-                                  .sort((a, b) => b.count - a.count)
-                                  .slice(0, 10); // Limit to top 10 for readability
-                              })()}
-                              margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis 
-                                dataKey="type" 
-                                angle={-45} 
-                                textAnchor="end" 
-                                height={60}
-                                tick={{ fontSize: 10 }}
-                              />
-                              <YAxis 
-                                tick={{ fontSize: 10 }}
-                                allowDecimals={false}
-                                tickFormatter={(value) => value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-                              />
-                              <Tooltip 
-                                formatter={(value) => [`${value} dwellings`, 'Count']}
-                                labelFormatter={(label, data) => data[0]?.payload?.fullType || label}
-                                contentStyle={{ 
-                                  backgroundColor: 'white', 
-                                  borderRadius: '8px',
-                                  border: '1px solid #e5e7eb',
-                                  padding: '8px'
-                                }}
-                              />
-                              <Bar 
-                                dataKey="count" 
-                                fill="#0088FE" 
-                                name="Dwelling Count"
-                                radius={[4, 4, 0, 0]}
-                              />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="h-full flex items-center justify-center text-gray-500">
-                            <p>No residential dwelling data available</p>
-                          </div>
-                        )}
+                  <div className="mt-4">
+                    {/* Chart Tabs */}
+                    <div className="mb-2 border-b">
+                      <div className="flex flex-wrap -mb-px">
+                        {['Development Values by Type', 'Residential Dwellings by Type', 'Applications over Time', 'Median Cost per Dwelling'].map((tabName) => (
+                          <button
+                            key={tabName}
+                            onClick={() => setActiveChartTab(tabName)}
+                            className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+                              activeChartTab === tabName
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            }`}
+                          >
+                            {tabName}
+                          </button>
+                        ))}
                       </div>
                     </div>
                     
-                    {/* Development Value Chart */}
+                    {/* Chart Content */}
                     <div className="bg-white p-4 rounded-lg border shadow-sm">
-                      <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                        <BarChartIcon className="w-4 h-4 mr-1 text-blue-500" />
-                        Development Values by Type
-                      </h3>
-                      <div className="h-64">
-                        {developmentData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={(() => {
-                                // Calculate total value by type
-                                const valueByType = {};
-                                developmentData.forEach(app => {
-                                  if (app.DevelopmentType && Array.isArray(app.DevelopmentType) && app.CostOfDevelopment) {
-                                    const typeName = getTransformedDevelopmentType(app.DevelopmentType);
-                                    if (!valueByType[typeName]) {
-                                      valueByType[typeName] = 0;
-                                    }
-                                    valueByType[typeName] += app.CostOfDevelopment;
-                                  }
-                                });
-                                
-                                // Convert to array and sort by value
-                                return Object.entries(valueByType)
-                                  .map(([type, value]) => ({
-                                    type: type.length > 15 ? type.substring(0, 13) + '...' : type,
-                                    value,
-                                    fullType: type // For tooltip
-                                  }))
-                                  .sort((a, b) => b.value - a.value)
-                                  .slice(0, 8); // Limit to top 8 for readability
-                              })()}
-                              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis 
-                                dataKey="type" 
-                                angle={-45} 
-                                textAnchor="end" 
-                                height={60}
-                                tick={{ fontSize: 10 }}
-                              />
-                              <YAxis 
-                                tickFormatter={(value) => {
-                                  if (value >= 1000000000) {
-                                    return `$${Math.floor(value / 1000000000).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}B`;
-                                  } else if (value >= 1000000) {
-                                    return `$${Math.floor(value / 1000000).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}M`;
-                                  } else {
-                                    return `$${Math.floor(value / 1000).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}K`;
-                                  }
-                                }}
-                                tick={{ fontSize: 10 }}
-                              />
-                              <Tooltip 
-                                formatter={(value) => [formatCurrency(value), 'Value']}
-                                labelFormatter={(label, data) => data[0]?.payload?.fullType || label}
-                                contentStyle={{ 
-                                  backgroundColor: 'white', 
-                                  borderRadius: '8px',
-                                  border: '1px solid #e5e7eb',
-                                  padding: '8px'
-                                }}
-                              />
-                              <Bar 
-                                dataKey="value" 
-                                fill="#0088FE" 
-                                name="Total Value"
-                                radius={[4, 4, 0, 0]}
-                              />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="h-full flex items-center justify-center text-gray-500">
-                            <p>No development value data available</p>
+                      {/* Development Values by Type */}
+                      {activeChartTab === 'Development Values by Type' && (
+                        <>
+                          <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                            <BarChartIcon className="w-4 h-4 mr-1 text-blue-500" />
+                            Development Values by Type
+                          </h3>
+                          <div className="h-80">
+                            {developmentData.length > 0 ? (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                  data={(() => {
+                                    // Calculate total value by type
+                                    const valueByType = {};
+                                    developmentData.forEach(app => {
+                                      if (app.DevelopmentType && Array.isArray(app.DevelopmentType) && app.CostOfDevelopment) {
+                                        const typeName = getTransformedDevelopmentType(app.DevelopmentType);
+                                        if (!valueByType[typeName]) {
+                                          valueByType[typeName] = 0;
+                                        }
+                                        valueByType[typeName] += app.CostOfDevelopment;
+                                      }
+                                    });
+                                    
+                                    // Convert to array and sort by value
+                                    return Object.entries(valueByType)
+                                      .map(([type, value]) => ({
+                                        type: type.length > 20 ? type.substring(0, 18) + '...' : type,
+                                        value,
+                                        fullType: type // For tooltip
+                                      }))
+                                      .sort((a, b) => b.value - a.value)
+                                      .slice(0, 12); // Increased limit for wider chart
+                                  })()}
+                                  margin={{ top: 20, right: 30, left: 40, bottom: 60 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis 
+                                    dataKey="type" 
+                                    angle={-45} 
+                                    textAnchor="end" 
+                                    height={60}
+                                    tick={{ fontSize: 10 }}
+                                  />
+                                  <YAxis 
+                                    tickFormatter={(value) => {
+                                      if (value >= 1000000000) {
+                                        return `$${Math.floor(value / 1000000000).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}B`;
+                                      } else if (value >= 1000000) {
+                                        return `$${Math.floor(value / 1000000).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}M`;
+                                      } else {
+                                        return `$${Math.floor(value / 1000).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}K`;
+                                      }
+                                    }}
+                                    tick={{ fontSize: 10 }}
+                                  />
+                                  <Tooltip 
+                                    formatter={(value) => [formatCurrency(value), 'Value']}
+                                    labelFormatter={(label, data) => data[0]?.payload?.fullType || label}
+                                    contentStyle={{ 
+                                      backgroundColor: 'white', 
+                                      borderRadius: '8px',
+                                      border: '1px solid #e5e7eb',
+                                      padding: '8px'
+                                    }}
+                                  />
+                                  <Bar 
+                                    dataKey="value" 
+                                    fill="#0088FE" 
+                                    name="Total Value"
+                                    radius={[4, 4, 0, 0]}
+                                  />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="h-full flex items-center justify-center text-gray-500">
+                                <p>No development value data available</p>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
+                        </>
+                      )}
+                      
+                      {/* Residential Dwellings by Type */}
+                      {activeChartTab === 'Residential Dwellings by Type' && (
+                        <>
+                          <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                            <BarChartIcon className="w-4 h-4 mr-1 text-blue-500" />
+                            Residential Dwellings by Type
+                          </h3>
+                          <div className="h-80">
+                            {Object.keys(summaryData.byResidentialType).length > 0 ? (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                  data={(() => {
+                                    // Convert residential types to array and sort by count
+                                    return Object.entries(summaryData.byResidentialType)
+                                      .map(([type, count]) => ({
+                                        type: type.length > 25 ? type.substring(0, 23) + '...' : type,
+                                        count,
+                                        fullType: type // For tooltip
+                                      }))
+                                      .sort((a, b) => b.count - a.count)
+                                      .slice(0, 15); // Increased limit for wider chart
+                                  })()}
+                                  margin={{ top: 5, right: 30, left: 40, bottom: 60 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis 
+                                    dataKey="type" 
+                                    angle={-45} 
+                                    textAnchor="end" 
+                                    height={60}
+                                    tick={{ fontSize: 10 }}
+                                  />
+                                  <YAxis 
+                                    tick={{ fontSize: 10 }}
+                                    allowDecimals={false}
+                                    tickFormatter={(value) => value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                                  />
+                                  <Tooltip 
+                                    formatter={(value) => [`${value} dwellings`, 'Count']}
+                                    labelFormatter={(label, data) => data[0]?.payload?.fullType || label}
+                                    contentStyle={{ 
+                                      backgroundColor: 'white', 
+                                      borderRadius: '8px',
+                                      border: '1px solid #e5e7eb',
+                                      padding: '8px'
+                                    }}
+                                  />
+                                  <Bar 
+                                    dataKey="count" 
+                                    fill="#0088FE" 
+                                    name="Dwelling Count"
+                                    radius={[4, 4, 0, 0]}
+                                  />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="h-full flex items-center justify-center text-gray-500">
+                                <p>No residential dwelling data available</p>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                      
+                      {/* Applications over Time */}
+                      {activeChartTab === 'Applications over Time' && (
+                        <>
+                          <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                            <BarChartIcon className="w-4 h-4 mr-1 text-blue-500" />
+                            Applications over Time
+                          </h3>
+                          <div className="h-80">
+                            {developmentData.length > 0 ? (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart
+                                  data={(() => {
+                                    // Get unique development categories
+                                    const categories = {};
+                                    developmentData.forEach(app => {
+                                      if (app.DevelopmentType && Array.isArray(app.DevelopmentType)) {
+                                        const category = app.DevelopmentType[0]?.DevelopmentCategory || 'Other';
+                                        if (!categories[category]) {
+                                          categories[category] = true;
+                                        }
+                                      }
+                                    });
+                                    
+                                    // Get all dates from the data and sort them
+                                    const dates = [...new Set(developmentData
+                                      .filter(app => app.LodgementDate)
+                                      .map(app => app.LodgementDate.substring(0, 7))) // YYYY-MM format
+                                    ].sort();
+                                    
+                                    // Initialize data structure for each date
+                                    const timeData = dates.map(date => {
+                                      const dataPoint = { date };
+                                      Object.keys(categories).forEach(category => {
+                                        dataPoint[category] = 0;
+                                      });
+                                      return dataPoint;
+                                    });
+                                    
+                                    // Fill in the cumulative counts
+                                    Object.keys(categories).forEach(category => {
+                                      let cumulativeCount = 0;
+                                      
+                                      timeData.forEach((dataPoint, i) => {
+                                        // Count applications of this category for this month or before
+                                        const monthlyCount = developmentData.filter(app => {
+                                          const appLodgementMonth = app.LodgementDate?.substring(0, 7);
+                                          const appCategory = app.DevelopmentType?.[0]?.DevelopmentCategory || 'Other';
+                                          return appLodgementMonth && appLodgementMonth <= dataPoint.date && appCategory === category;
+                                        }).length;
+                                        
+                                        cumulativeCount = monthlyCount;
+                                        dataPoint[category] = cumulativeCount;
+                                      });
+                                    });
+                                    
+                                    // Format dates for display
+                                    return timeData.map(item => ({
+                                      ...item,
+                                      displayDate: new Date(item.date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                                    }));
+                                  })()}
+                                  margin={{ top: 20, right: 30, left: 40, bottom: 60 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis 
+                                    dataKey="displayDate" 
+                                    angle={-45} 
+                                    textAnchor="end" 
+                                    height={60}
+                                    tick={{ fontSize: 10 }}
+                                  />
+                                  <YAxis 
+                                    tickFormatter={(value) => value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                                    tick={{ fontSize: 10 }}
+                                  />
+                                  <Tooltip 
+                                    formatter={(value, name) => [`${value} applications`, name]}
+                                    contentStyle={{ 
+                                      backgroundColor: 'white', 
+                                      borderRadius: '8px',
+                                      border: '1px solid #e5e7eb',
+                                      padding: '8px'
+                                    }}
+                                  />
+                                  {Object.keys((() => {
+                                    const categories = {};
+                                    developmentData.forEach(app => {
+                                      if (app.DevelopmentType && Array.isArray(app.DevelopmentType)) {
+                                        const category = app.DevelopmentType[0]?.DevelopmentCategory || 'Other';
+                                        if (!categories[category]) {
+                                          categories[category] = true;
+                                        }
+                                      }
+                                    });
+                                    return categories;
+                                  })()).map((category, index) => (
+                                    <Line 
+                                      key={category}
+                                      type="monotone"
+                                      dataKey={category}
+                                      stroke={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'][index % 5]}
+                                      activeDot={{ r: 8 }}
+                                      strokeWidth={2}
+                                    />
+                                  ))}
+                                </LineChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="h-full flex items-center justify-center text-gray-500">
+                                <p>No application timeline data available</p>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                      
+                      {/* Median Cost per Dwelling */}
+                      {activeChartTab === 'Median Cost per Dwelling' && (
+                        <>
+                          <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                            <BarChartIcon className="w-4 h-4 mr-1 text-blue-500" />
+                            Median Cost per Dwelling
+                          </h3>
+                          <div className="h-80">
+                            {developmentData.length > 0 ? (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                  data={(() => {
+                                    // Calculate median cost per dwelling by type
+                                    const dwellingCosts = {};
+                                    
+                                    // First collect all costs per dwelling for each type
+                                    developmentData.forEach(app => {
+                                      if (app.DevelopmentType && Array.isArray(app.DevelopmentType) && 
+                                          app.CostOfDevelopment && app.NumberOfNewDwellings > 0) {
+                                        const typeName = getTransformedDevelopmentType(app.DevelopmentType);
+                                        
+                                        // Only include residential types
+                                        const isResidential = app.DevelopmentType.some(type => 
+                                          isResidentialType(type.DevelopmentType)
+                                        );
+                                        
+                                        if (isResidential) {
+                                          if (!dwellingCosts[typeName]) {
+                                            dwellingCosts[typeName] = [];
+                                          }
+                                          const costPerDwelling = app.CostOfDevelopment / app.NumberOfNewDwellings;
+                                          dwellingCosts[typeName].push(costPerDwelling);
+                                        }
+                                      }
+                                    });
+                                    
+                                    // Calculate median for each type
+                                    const medianCostByType = {};
+                                    Object.entries(dwellingCosts).forEach(([type, costs]) => {
+                                      if (costs.length > 0) {
+                                        costs.sort((a, b) => a - b);
+                                        const mid = Math.floor(costs.length / 2);
+                                        const median = costs.length % 2 === 0
+                                          ? (costs[mid - 1] + costs[mid]) / 2
+                                          : costs[mid];
+                                        medianCostByType[type] = median;
+                                      }
+                                    });
+                                    
+                                    // Convert to array and sort by median cost
+                                    return Object.entries(medianCostByType)
+                                      .map(([type, medianCost]) => ({
+                                        type: type.length > 20 ? type.substring(0, 18) + '...' : type,
+                                        medianCost,
+                                        fullType: type // For tooltip
+                                      }))
+                                      .sort((a, b) => b.medianCost - a.medianCost)
+                                      .slice(0, 12); // Limit for readability
+                                  })()}
+                                  margin={{ top: 20, right: 30, left: 40, bottom: 60 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis 
+                                    dataKey="type" 
+                                    angle={-45} 
+                                    textAnchor="end" 
+                                    height={60}
+                                    tick={{ fontSize: 10 }}
+                                  />
+                                  <YAxis 
+                                    tickFormatter={(value) => {
+                                      if (value >= 1000000) {
+                                        return `$${Math.floor(value / 1000000).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}M`;
+                                      } else if (value >= 1000) {
+                                        return `$${Math.floor(value / 1000).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}K`;
+                                      } else {
+                                        return `$${Math.floor(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+                                      }
+                                    }}
+                                    tick={{ fontSize: 10 }}
+                                  />
+                                  <Tooltip 
+                                    formatter={(value) => [formatCurrency(value), 'Median Cost per Dwelling']}
+                                    labelFormatter={(label, data) => data[0]?.payload?.fullType || label}
+                                    contentStyle={{ 
+                                      backgroundColor: 'white', 
+                                      borderRadius: '8px',
+                                      border: '1px solid #e5e7eb',
+                                      padding: '8px'
+                                    }}
+                                  />
+                                  <Bar 
+                                    dataKey="medianCost" 
+                                    fill="#00C49F" 
+                                    name="Median Cost per Dwelling"
+                                    radius={[4, 4, 0, 0]}
+                                  />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="h-full flex items-center justify-center text-gray-500">
+                                <p>No dwelling cost data available</p>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                   
@@ -2201,10 +2123,23 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                     <button
                       onClick={handleCreateGeoJSONLayer}
                       className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1 text-sm"
-                      disabled={!developmentData.length || developmentLayer}
+                      disabled={!developmentData.length || developmentLayer || isGeneratingLayer}
                     >
-                      <MapPin className="w-4 h-4" />
-                      <span>Generate Layer</span>
+                      {isGeneratingLayer ? (
+                        <>
+                          <Loader className="w-4 h-4 animate-spin" />
+                          <span>
+                            {totalFeatures > 0 && processedFeatures > 0 
+                              ? `Generating... ${Math.round((processedFeatures / totalFeatures) * 100)}%` 
+                              : 'Generating...'}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <MapPin className="w-4 h-4" />
+                          <span>Generate Layer</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -2276,14 +2211,13 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             </div>
                           </th>
                           <th 
-                            className="group px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-24 bg-gray-50 sticky top-0 z-10 shadow-sm"
+                            className="group px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-24 bg-gray-50 sticky top-0 z-10 shadow-sm"
                             onClick={() => toggleSort('dwellings')}
                           >
-                            <div className="flex items-center space-x-1">
+                            <div className="flex items-center justify-center" title="Dwellings">
                               <Home className="w-4 h-4 text-gray-400" />
-                              <span>Dwellings</span>
                               {sortField === 'dwellings' && (
-                                <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
+                                <ArrowUpDown className={`w-3.5 h-3.5 ml-1 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
                               )}
                             </div>
                           </th>
@@ -2335,7 +2269,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{application.ApplicationStatus}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getAbbreviatedAppType(application.ApplicationType)}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatCostShort(application.CostOfDevelopment)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{application.NumberOfNewDwellings || 0}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{application.NumberOfNewDwellings || 0}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               <div className="flex items-center">
                                 <span className="whitespace-nowrap">

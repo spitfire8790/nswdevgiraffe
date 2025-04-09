@@ -3,6 +3,8 @@ import * as turf from '@turf/turf';
 import { validateGeoJSON } from '../../utils/mapUtils';
 import { formatCurrency } from '../../utils/formatters';
 import { typeMap } from './developmentTypes';
+import { applyDevelopmentCategoryStyling, categorizeApplications } from '../layerStyle/lensConfig';
+import { RESIDENTIAL_TYPES } from './residentialTypes';
 
 // Constants for application status colors
 const STATUS_COLORS = {
@@ -14,40 +16,7 @@ const STATUS_COLORS = {
   'default': '#666666'       // Grey
 };
 
-// Define residential development types
-const RESIDENTIAL_TYPES = new Set([
-  'Dwelling',
-  'Dwelling house',
-  'Secondary dwelling',
-  'Dual occupancy',
-  'Dual occupancy (attached)',
-  'Dual occupancy (detached)',
-  'Residential flat building',
-  'Multi-dwelling housing',
-  'Multi-dwelling housing (terraces)',
-  'Semi-attached dwelling',
-  'Attached dwelling',
-  'Semi-detached dwelling',
-  'Shop top housing',
-  'Boarding house',
-  'Seniors housing',
-  'Group homes',
-  'Group home',
-  'Group home (permanent)',
-  'Group home (transitional)',
-  'Build-to-rent',
-  'Co-living',
-  'Co-living housing',
-  'Manufactured home',
-  'Moveable dwelling',
-  "Rural worker's dwelling",
-  'Independent living units',
-  'Manor house',
-  'Medium Density Housing',
-  'Non-standard Housing',
-  'Residential Accommodation',
-  'Manor houses'
-]);
+
 
 // Helper function to check if a development type is residential
 const isResidentialType = (type) => {
@@ -97,7 +66,8 @@ export const createDevelopmentLayer = async (
   selectedFeatures,
   setDevelopmentLayer,
   setError,
-  setTotalFeatures
+  setTotalFeatures,
+  setProcessedFeatures
 ) => {
   // Safety check first
   if (!applications || !Array.isArray(applications) || applications.length === 0) {
@@ -108,8 +78,17 @@ export const createDevelopmentLayer = async (
 
   console.log(`Processing ${applications.length} applications for map display`);
   
+  // Reset processed features count
+  if (setProcessedFeatures) {
+    setProcessedFeatures(0);
+  }
+  
+  // Categorize applications first
+  const categorizedApplications = categorizeApplications(applications);
+  
   // Create GeoJSON features with careful error handling
-  const featuresWithCoordinates = applications
+  let processed = 0;
+  const featuresWithCoordinates = categorizedApplications
     .filter(app => {
       const hasLocation = app?.Location?.[0]?.X && app?.Location?.[0]?.Y;
       if (!hasLocation) {
@@ -128,6 +107,12 @@ export const createDevelopmentLayer = async (
           return null;
         }
         
+        // Update processed count and notify
+        processed++;
+        if (setProcessedFeatures && processed % 10 === 0) {
+          setProcessedFeatures(processed);
+        }
+        
         const coordinates = [x, y];
         const status = app.ApplicationStatus || 'Unknown';
         const color = STATUS_COLORS[status] || STATUS_COLORS.default;
@@ -139,13 +124,12 @@ export const createDevelopmentLayer = async (
           isResidentialType(type.DevelopmentType)
         ) || false;
         
-        // Return valid feature
+        // Return valid feature with the added Category property
         return {
           type: 'Feature',
           properties: {
             id: app.ApplicationId,
             title: app.DevelopmentDescription || 'Unknown',
-            address: app.Location?.[0]?.FullAddress || 'Unknown location',
             status: status,
             color: color,
             outlineColor: isResidential ? '#000000' : '#666666',
@@ -168,7 +152,8 @@ export const createDevelopmentLayer = async (
             Subdivision: app.SubdivisionProposedFlag || '',
             Address: app.Location?.[0]?.FullAddress || '',
             Lots: app.Location?.[0]?.Lot ? app.Location[0].Lot.map(lot => 
-              `${lot.Lot}//${lot.PlanLabel}`).join('; ') : ''
+              `${lot.Lot}//${lot.PlanLabel}`).join('; ') : '',
+            Category: app.Category || 'Miscellaneous and Administrative'
           },
           geometry: {
             type: 'Point',
@@ -193,8 +178,14 @@ export const createDevelopmentLayer = async (
   setTotalFeatures(featuresWithCoordinates.length);
   
   try {
-    // Get council name for layer ID
-    const councilName = selectedFeatures?.[0]?.properties?.copiedFrom?.site_suitability__LGA || 'Unknown';
+    // Get council name for layer ID - check all possible paths
+    let councilName = 'Unknown';
+    if (selectedFeatures && selectedFeatures.length > 0) {
+      councilName = selectedFeatures[0]?.properties?.copiedFrom?.site_suitability__LGA || 
+                   selectedFeatures[0]?.properties?.site_suitability__LGA || 
+                   'Unknown';
+      console.log('Using LGA name for layer:', councilName);
+    }
     
     // Format current date in the "2 April 2025" format
     const currentDate = new Date();
@@ -203,10 +194,12 @@ export const createDevelopmentLayer = async (
     const year = currentDate.getFullYear();
     const formattedDate = `${day} ${month} ${year}`;
     
-    // Use a timestamp to create a unique layer identifier
-    const timestamp = new Date().getTime();
-    const layerId = `DA-${councilName.replace(/\s+/g, '-')}-${formattedDate.replace(/\s+/g, '-')}`;
-    setDevelopmentLayer(layerId);
+    // Create the formatted layer name (this is what we'll use consistently)
+    const layerName = `DA - ${councilName} - ${formattedDate}`;
+    console.log('[LAYER] Creating layer with name:', layerName);
+    
+    // Store the layer name in state for later reference
+    setDevelopmentLayer(layerName);
     
     // Create the feature collection with explicit initialization and deep copy to ensure valid structure
     const featureCollection = JSON.parse(JSON.stringify({
@@ -216,7 +209,7 @@ export const createDevelopmentLayer = async (
     
     console.log(`Creating GeoJSON layer with ${featuresWithCoordinates.length} development application points`);
     
-    // Define layer style for points
+    // Define layer style for points - this will be replaced with advanced styling from lensConfig
     const layerStyle = {
       type: "circle",
       paint: {
@@ -282,7 +275,6 @@ export const createDevelopmentLayer = async (
               outlineColor: f.properties.outlineColor || '#666666',
               fillColor: f.properties.fillColor || '#666666',
               isResidential: !!f.properties.isResidential,
-              developmentType: f.properties.developmentType || 'Unknown',
               "Clean Development Type": f.properties["Clean Development Type"] || f.properties.developmentType || 'Unknown',
               "Detailed Development Type": f.properties["Detailed Development Type"] || '',
               PAN: f.properties.PAN || '',
@@ -296,7 +288,8 @@ export const createDevelopmentLayer = async (
               "EPI Variation": f.properties["EPI Variation"] || '',
               Subdivision: f.properties.Subdivision || '',
               Address: f.properties.Address || '',
-              Lots: f.properties.Lots || ''
+              Lots: f.properties.Lots || '',
+              Category: f.properties.Category || 'Miscellaneous and Administrative'
             }
           }))
       };
@@ -308,20 +301,51 @@ export const createDevelopmentLayer = async (
         return null;
       }
       
-      // Now invoke the RPC method with the clean object
-      const newLayerId = await rpc.invoke('createGeoJSONLayer', [
-        `DA - ${councilName} - ${formattedDate}`,
-        simplifiedFeatureCollection,
-        {
-          description: `Development Applications in ${councilName} - ${formattedDate}`,
-          style: layerStyle
+      // Now invoke the RPC method with the clean object - createGeoJSONLayer returns void
+      try {
+        console.log(`[LAYER] Calling createGeoJSONLayer with ${simplifiedFeatureCollection.features.length} features`);
+        console.log(`[LAYER] Layer name: "${layerName}"`);
+        console.log(`[LAYER] First few feature properties:`, 
+          simplifiedFeatureCollection.features.slice(0, 2).map(f => 
+            Object.keys(f.properties).slice(0, 5).reduce((obj, key) => {
+              obj[key] = f.properties[key];
+              return obj;
+            }, {})
+          ));
+        
+        const startTime = Date.now();
+        await rpc.invoke('createGeoJSONLayer', [
+          layerName,  // Use the consistent layer name
+          simplifiedFeatureCollection,
+          {
+            description: `Development Applications in ${councilName} - ${formattedDate}`,
+            style: layerStyle
+          }
+        ]);
+        const duration = Date.now() - startTime;
+        
+        console.log(`[LAYER] createGeoJSONLayer completed in ${duration}ms`);
+        console.log(`[LAYER] GeoJSON layer created with name: "${layerName}"`);
+        
+        // Apply the advanced styling using the same layer name
+        console.log(`[LAYER] Now applying custom styling to layer "${layerName}"`);
+        const styleStart = Date.now();
+        const styleResult = await applyDevelopmentCategoryStyling(layerName);
+        const styleDuration = Date.now() - styleStart;
+        
+        console.log(`[LAYER] Style application ${styleResult ? 'succeeded' : 'failed'} in ${styleDuration}ms`);
+        
+        // Update final processed count to match total
+        if (setProcessedFeatures) {
+          setProcessedFeatures(featuresWithCoordinates.length);
         }
-      ]);
-      
-      console.log('GeoJSON layer created with ID:', newLayerId);
-      setDevelopmentLayer(newLayerId);
-      return newLayerId;
-      
+        
+        return layerName;
+      } catch (error) {
+        console.error('Error creating GeoJSON layer:', error);
+        setError(`Error creating GeoJSON layer: ${error.message}`);
+        return null;
+      }
     } catch (error) {
       console.error('Error creating GeoJSON layer:', error);
       setError(`Error creating GeoJSON layer: ${error.message}`);
