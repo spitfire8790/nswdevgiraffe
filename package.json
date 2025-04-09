@@ -1,0 +1,41 @@
+{
+  "name": "development-modal-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run proxy\" \"vite\"",
+    "dev:vite": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "proxy": "node server.js",
+    "vercel-build": "vite build"
+  },
+  "dependencies": {
+    "@gi-nx/iframe-sdk": "^0.0.11",
+    "@turf/turf": "^6.5.0",
+    "@vercel/analytics": "^1.5.0",
+    "concurrently": "^9.1.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.18.2",
+    "framer-motion": "^10.16.4",
+    "lucide-react": "^0.277.0",
+    "node-fetch": "^3.3.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.8.0",
+    "tailwindcss": "^3.3.5"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.0.3",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "vite": "^4.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
