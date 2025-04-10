@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { saveAs } from 'file-saver';
 import { 
   X, 
   FileSpreadsheet,
@@ -759,6 +760,111 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
       return `$${(value / 1000000).toFixed(1)}M`;
     } else {
       return `$${Math.round(value / 1000)}K`;
+    }
+  };
+  
+  // Handle generating and downloading CSV
+  const handleGenerateCSV = () => {
+    try {
+      // Get council name for layer ID - check all possible paths
+      let councilName = 'Unknown';
+      if (selectedFeatures && selectedFeatures.length > 0) {
+        councilName = selectedFeatures[0]?.properties?.copiedFrom?.site_suitability__LGA || 
+                     selectedFeatures[0]?.properties?.site_suitability__LGA || 
+                     selectedLga ||
+                     'Unknown';
+      } else if (selectedLga) {
+        councilName = selectedLga;
+      }
+      
+      // Format current date in the "2 April 2025" format for filename consistency with the layer
+      const currentDate = new Date();
+      const day = currentDate.getDate();
+      const month = currentDate.toLocaleString('en-US', { month: 'long' });
+      const year = currentDate.getFullYear();
+      const formattedDate = `${day} ${month} ${year}`;
+      
+      // Create the formatted filename (same as layer name)
+      const filename = `DA - ${councilName} - ${formattedDate}.csv`;
+      
+      // Get filtered applications (same as what would be shown on the map)
+      const filteredApps = getFilteredApplications();
+      
+      // Define CSV headers - using the same structure as the layer properties
+      const headers = [
+        'Address',
+        'Status',
+        'Clean Development Type',
+        'Detailed Development Type',
+        'PAN',
+        'Council Reference',
+        'Lodgement Date',
+        'Determination Date',
+        'Cost',
+        'Dwellings',
+        'Storeys',
+        'EPI Variation',
+        'Subdivision',
+        'Lots',
+        'Category'
+      ];
+      
+      // Create CSV content
+      let csvContent = headers.join(',') + '\n';
+      
+      // Add each application as a row in the CSV
+      filteredApps.forEach(app => {
+        // Process the detailed development type
+        const detailedDevType = app.DevelopmentType ? 
+          app.DevelopmentType.map(dt => dt.DevelopmentType).join('; ') : '';
+        
+        // Process address with proper CSV escaping
+        const address = app.Location?.[0]?.FullAddress ? 
+          `"${app.Location[0].FullAddress.replace(/"/g, '""')}"` : '';
+        
+        // Process lots from location if available
+        const lots = app.Location?.[0]?.Lot ? 
+          app.Location[0].Lot.map(lot => `${lot.Lot}//${lot.PlanLabel}`).join('; ') : '';
+        
+        // Get transformed development type
+        const transformedType = getTransformedDevelopmentType(app.DevelopmentType || []);
+        
+        // Get category based on the transformed type
+        const primaryTransformedType = transformedType.split(',')[0].trim();
+        const category = getDevelopmentCategory(primaryTransformedType);
+        
+        // Create CSV row with proper escaping for all fields
+        const row = [
+          address,
+          `"${(app.ApplicationStatus || '').replace(/"/g, '""')}"`,
+          `"${transformedType.replace(/"/g, '""')}"`,
+          `"${detailedDevType.replace(/"/g, '""')}"`,
+          `"${(app.PlanningPortalApplicationNumber || '').replace(/"/g, '""')}"`,
+          `"${(app.CouncilApplicationNumber || '').replace(/"/g, '""')}"`,
+          `"${(app.LodgementDate || '').replace(/"/g, '""')}"`,
+          `"${(app.DeterminationDate || '').replace(/"/g, '""')}"`,
+          app.CostOfDevelopment || 0,
+          app.NumberOfNewDwellings || 0,
+          app.NumberOfStoreys || 0,
+          `"${(app.EPIVariationProposedFlag || '').replace(/"/g, '""')}"`,
+          `"${(app.SubdivisionProposedFlag || '').replace(/"/g, '""')}"`,
+          `"${lots.replace(/"/g, '""')}"`,
+          `"${category.replace(/"/g, '""')}"`
+        ].join(',');
+        
+        csvContent += row + '\n';
+      });
+      
+      // Create a Blob with the CSV content
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+      
+      // Use file-saver to download the file
+      saveAs(blob, filename);
+      
+      console.log(`CSV exported successfully: ${filename}`);
+    } catch (error) {
+      console.error('Error generating CSV:', error);
+      setError(`Error generating CSV: ${error.message}`);
     }
   };
 
@@ -2252,6 +2358,15 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                           < span>Generate Layer</span>
                         </>
                       )}
+                    </button>
+                    
+                    <button
+                      onClick={handleGenerateCSV}
+                      className="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors flex items-center gap-1 text-sm"
+                      disabled={!developmentData.length}
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      <span>Generate CSV</span>
                     </button>
                   </div>
                 </div>
