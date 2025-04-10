@@ -1758,13 +1758,13 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             Development Values by Type
                           </h3>
                           <div className="h-80">
-                            {developmentData.length > 0 ? (
+                            {getFilteredApplications().length > 0 ? (
                               <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
                                   data={(() => {
                                     // Calculate total value by type
                                     const valueByType = {};
-                                    developmentData.forEach(app => {
+                                    getFilteredApplications().forEach(app => {
                                       if (app.DevelopmentType && Array.isArray(app.DevelopmentType) && app.CostOfDevelopment) {
                                         const typeName = getTransformedDevelopmentType(app.DevelopmentType);
                                         if (!valueByType[typeName]) {
@@ -1928,7 +1928,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                             Dwellings over Time by Type
                           </h3>
                           <div className="h-80">
-                            {developmentData.length > 0 ? (
+                            {getFilteredApplications().length > 0 ? (
                               <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart
                                   data={(() => {
@@ -1968,8 +1968,8 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                                       dwellingTypes['Other'] = true;
                                     }
                                     
-                                    // Get all dates from the data and sort them
-                                    const dates = [...new Set(developmentData
+                                    // Get all dates from the filtered data and sort them
+                                    const dates = [...new Set(getFilteredApplications()
                                       .filter(app => app.LodgementDate && app.NumberOfNewDwellings && app.NumberOfNewDwellings > 0)
                                       .map(app => app.LodgementDate.substring(0, 7))) // YYYY-MM format
                                     ].sort();
@@ -1986,7 +1986,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                                     // Fill in the cumulative counts
                                     timeData.forEach((dataPoint, i) => {
                                       // For each date, sum the dwellings by type up to this point in time
-                                      const appsUpToThisDate = developmentData.filter(app => 
+                                      const appsUpToThisDate = getFilteredApplications().filter(app => 
                                         app.LodgementDate && 
                                         app.LodgementDate.substring(0, 7) <= dataPoint.date &&
                                         app.NumberOfNewDwellings && 
@@ -2095,8 +2095,8 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                                       type="monotone"
                                       dataKey={type}
                                       stackId="1"
-                                      fill={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'][index % 6]}
-                                      stroke={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'][index % 6]}
+                                      fill={type === 'Secondary dwelling' ? '#FF69B4' : ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'][index % 6]}
+                                      stroke={type === 'Secondary dwelling' ? '#FF69B4' : ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'][index % 6]}
                                     />
                                   ))}
                                 </AreaChart>
@@ -2126,7 +2126,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                                     const dwellingCosts = {};
                                     
                                     // First collect all costs per dwelling for each type
-                                    developmentData.forEach(app => {
+                                    getFilteredApplications().forEach(app => {
                                       if (app.DevelopmentType && Array.isArray(app.DevelopmentType) && 
                                           app.CostOfDevelopment && app.NumberOfNewDwellings > 0) {
                                         const typeName = getTransformedDevelopmentType(app.DevelopmentType);
