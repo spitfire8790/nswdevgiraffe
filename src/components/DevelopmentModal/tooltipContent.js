@@ -17,6 +17,10 @@ export const tooltipContent = {
     Note that the underlying data is updated daily but there may be a short delay between when applications 
     are submitted and when they appear in this view.
 
+    Please note this app is not part of the Land iQ app.
+
+    << Please drag to increase width of the panel for best viewing experience.
+
     `,
     source: `Data sourced from the NSW Government's Development Application API`,
     sourceLink: "https://www.planningportal.nsw.gov.au/opendata/dataset/online-da-data-api"

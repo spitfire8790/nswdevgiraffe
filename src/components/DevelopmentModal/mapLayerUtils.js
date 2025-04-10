@@ -3,7 +3,6 @@ import * as turf from '@turf/turf';
 import { validateGeoJSON } from '../../utils/mapUtils';
 import { formatCurrency } from '../../utils/formatters';
 import { typeMap } from './developmentTypes';
-import { applyDevelopmentCategoryStyling, categorizeApplications } from '../layerStyle/lensConfig';
 import { RESIDENTIAL_TYPES } from './residentialTypes';
 
 // Constants for application status colors
@@ -16,10 +15,8 @@ const STATUS_COLORS = {
   'default': '#666666'       // Grey
 };
 
-
-
 // Helper function to check if a development type is residential
-const isResidentialType = (type) => {
+export const isResidentialType = (type) => {
   return RESIDENTIAL_TYPES.has(type);
 };
 
@@ -83,8 +80,11 @@ export const createDevelopmentLayer = async (
     setProcessedFeatures(0);
   }
   
-  // Categorize applications first
-  const categorizedApplications = categorizeApplications(applications);
+  // Categorize applications - simplified version without lensConfig dependency
+  const categorizedApplications = applications.map(app => {
+    // Copy the application to avoid mutating the original
+    return { ...app, Category: 'Miscellaneous and Administrative' };
+  });
   
   // Create GeoJSON features with careful error handling
   let processed = 0;
@@ -115,6 +115,9 @@ export const createDevelopmentLayer = async (
         
         const coordinates = [x, y];
         const status = app.ApplicationStatus || 'Unknown';
+
+        // Note: We're keeping fillColor & color properties for compatibility,
+        // but they won't be used since we're now using fixed blue styling
         const color = STATUS_COLORS[status] || STATUS_COLORS.default;
         
         // Check if this is a residential development
@@ -124,7 +127,7 @@ export const createDevelopmentLayer = async (
           isResidentialType(type.DevelopmentType)
         ) || false;
         
-        // Return valid feature with the added Category property
+        // Return valid feature with properties
         return {
           type: 'Feature',
           properties: {
@@ -209,14 +212,14 @@ export const createDevelopmentLayer = async (
     
     console.log(`Creating GeoJSON layer with ${featuresWithCoordinates.length} development application points`);
     
-    // Define layer style for points - this will be replaced with advanced styling from lensConfig
+    // Define layer style for points - use blue circles styling with different sizes based on isResidential
     const layerStyle = {
       type: "circle",
       paint: {
         "circle-radius": ["case", ["get", "isResidential"], 8, 6],
-        "circle-color": ["get", "fillColor"],
+        "circle-color": "#0000FF", // Blue circle color
         "circle-stroke-width": ["case", ["get", "isResidential"], 3, 2],
-        "circle-stroke-color": ["get", "outlineColor"]
+        "circle-stroke-color": "#000000" // Black outline
       }
     };
     
@@ -322,14 +325,6 @@ export const createDevelopmentLayer = async (
         
         console.log(`[LAYER] createGeoJSONLayer completed in ${duration}ms`);
         console.log(`[LAYER] GeoJSON layer created with name: "${layerName}"`);
-        
-        // Apply the advanced styling using the same layer name
-        console.log(`[LAYER] Now applying custom styling to layer "${layerName}"`);
-        const styleStart = Date.now();
-        const styleResult = await applyDevelopmentCategoryStyling(layerName);
-        const styleDuration = Date.now() - styleStart;
-        
-        console.log(`[LAYER] Style application ${styleResult ? 'succeeded' : 'failed'} in ${styleDuration}ms`);
         
         // Update final processed count to match total
         if (setProcessedFeatures) {

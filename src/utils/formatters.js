@@ -143,4 +143,75 @@ export const formatArea = (value, includeUnit = true) => {
     console.error('Error formatting area:', error);
     return value.toString();
   }
+};
+
+/**
+ * Formats date as "7 April 2025"
+ * 
+ * @param {Date|string} date - Date to format
+ * @returns {string} Formatted date
+ */
+export const formatDateLong = (date) => {
+  if (!date) return 'Unknown';
+  
+  // Convert to Date object if it's a string
+  const dateObj = date instanceof Date ? date : new Date(date);
+  if (isNaN(dateObj)) return 'Unknown';
+  
+  const day = dateObj.getDate();
+  const month = dateObj.toLocaleString('en-US', { month: 'long' });
+  const year = dateObj.getFullYear();
+  
+  return `${day} ${month} ${year}`;
+};
+
+/**
+ * Formats date as "2 Jan 24" for compact table display
+ * 
+ * @param {string} dateString - Date string to format
+ * @returns {string} Formatted date
+ */
+export const formatDateShort = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date)) return dateString;
+  
+  const day = date.getDate();
+  const month = date.toLocaleString('en-US', { month: 'short' });
+  const year = date.getFullYear().toString().substring(2);
+  
+  return `${day} ${month} ${year}`;
+};
+
+/**
+ * Formats cost as $#.#M if >= $1M, otherwise $###K
+ * 
+ * @param {number} cost - Cost value to format
+ * @returns {string} Formatted cost
+ */
+export const formatCostShort = (cost) => {
+  if (!cost || isNaN(cost)) return '$0';
+  
+  if (cost >= 1000000) {
+    return `$${(cost / 1000000).toFixed(1)}M`;
+  } else {
+    return `$${Math.round(cost / 1000).toFixed(0)}K`;
+  }
+};
+
+/**
+ * Returns abbreviated form of an application type (e.g., "Development Application" becomes "DA")
+ * 
+ * @param {string} type - The application type to abbreviate
+ * @returns {string} Abbreviated application type
+ */
+export const getAbbreviatedAppType = (type) => {
+  if (!type) return '';
+  
+  if (type.toLowerCase().includes('development application')) return 'DA';
+  if (type.toLowerCase().includes('modification')) return 'MOD';
+  if (type.toLowerCase().includes('review')) return 'REV';
+  
+  // First letter of each word as fallback
+  return type.split(' ').map(word => word[0]).join('');
 }; 

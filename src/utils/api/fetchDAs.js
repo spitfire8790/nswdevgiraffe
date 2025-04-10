@@ -1,6 +1,7 @@
 /**
  * Utilities for fetching development application data
  */
+import { track } from '@vercel/analytics/server';
 
 /**
  * Fetches all development applications for a given council
@@ -15,6 +16,13 @@ export async function fetchAllDAs(councilName, setLoadingProgress) {
   
   try {
     console.log(`Fetching DAs for council: ${councilName}`);
+    
+    // Track API request start
+    await track('DA_Fetch_Started', {
+      councilName,
+      pageSize,
+      timestamp: new Date().toISOString()
+    });
     
     const API_BASE_URL = process.env.NODE_ENV === 'development' 
       ? 'http://localhost:3000'
@@ -60,6 +68,13 @@ export async function fetchAllDAs(councilName, setLoadingProgress) {
           errorText: errorText.substring(0, 200) // Limit error text length to avoid console spam
         });
         
+        // Track API error
+        await track('DA_Fetch_Error', {
+          councilName,
+          errorStatus: response.status,
+          errorType: 'API_Response_Error'
+        });
+        
         throw new Error(`API responded with ${response.status}: ${response.statusText}`);
       }
 
@@ -99,6 +114,13 @@ export async function fetchAllDAs(councilName, setLoadingProgress) {
 
       if (!data || !data.Application) {
         console.error('Invalid response format:', data);
+        
+        // Track format error
+        await track('DA_Fetch_Error', {
+          councilName,
+          errorType: 'Invalid_Response_Format'
+        });
+        
         throw new Error('Invalid response format from DA API');
       }
 
@@ -142,6 +164,14 @@ export async function fetchAllDAs(councilName, setLoadingProgress) {
             
             if (!pageResponse.ok) {
               console.warn(`Failed to fetch page ${page}, continuing with data we have`);
+              
+              // Track page fetch error
+              await track('DA_Page_Fetch_Error', {
+                councilName,
+                pageNumber: page,
+                errorStatus: pageResponse.status
+              });
+              
               continue;
             }
             
@@ -163,19 +193,50 @@ export async function fetchAllDAs(councilName, setLoadingProgress) {
             
           } catch (pageError) {
             console.warn(`Error fetching page ${page}, skipping:`, pageError);
+            
+            // Track page fetch error
+            await track('DA_Page_Fetch_Error', {
+              councilName,
+              pageNumber: page,
+              errorMessage: pageError.message
+            });
+            
             // Continue with the data we have
           }
         }
       }
     } catch (fetchError) {
       console.error('Error during API fetch:', fetchError);
+      
+      // Track fetch error
+      await track('DA_Fetch_Error', {
+        councilName,
+        errorMessage: fetchError.message,
+        errorType: 'Fetch_Error'
+      });
+      
       throw fetchError;
     }
+
+    // Track successful fetch completion
+    await track('DA_Fetch_Completed', {
+      councilName,
+      recordCount: allDAs.length,
+      pagesFetched: maxPages || 1
+    });
 
     console.log(`Successfully fetched ${allDAs.length} DAs`);
     return allDAs;
   } catch (error) {
     console.error('Error fetching DAs:', error);
+    
+    // Track overall fetch error
+    await track('DA_Fetch_Error', {
+      councilName,
+      errorMessage: error.message,
+      errorType: 'Overall_Error'
+    });
+    
     throw error; // Re-throw so the UI can show error state
   }
 }

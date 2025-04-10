@@ -1,6 +1,6 @@
-# Proposed Refactor Plan
+# Proposed Refactor Plan (Updated)
 
-Below is a high-level plan for refactoring the `DevelopmentModal` component to reduce file size and improve maintainability, along with ASCII-style diagrams to illustrate the recommended folder structure.
+Below is a high-level plan for refactoring the `DevelopmentModal` component to reduce file size and improve maintainability, based on the current state of the code. ASCII-style diagrams illustrate the recommended folder structure.
 
 ---
 
@@ -16,33 +16,25 @@ Below is a high-level plan for refactoring the `DevelopmentModal` component to r
 
 ### 1. Extract Data Fetching and API Utilities
 
-The file includes multiple functions dedicated to querying data and handling multi-page DA responses:
+The main component relies on external utilities for fetching and cleaning data:
 
-- Functions to move:
-  - `fetchAllDAs` (approximately lines 260–390)
-  - `deduplicateDAs` (approx. lines 400–530)
-  - `queryLgaFromCoordinates` (approx. lines 1750–1860)
+- Functions already externalized (verify imports):
 
-These could be grouped under a `utils/api` folder. For instance:
+  - `fetchAllDAs` (imported from `../../utils/api/fetchDAs`)
+  - `deduplicateDAs` (imported from `../../utils/api/dataCleanup`)
+  - `queryLgaFromCoordinates` (imported but no longer used in this component after removing auto-detect - consider removing import if not needed elsewhere).
 
-```
-utils/
-└── api/
-    ├── fetchDAs.js       // fetchAllDAs and paging logic
-    ├── dataCleanup.js    // deduplicateDAs
-    └── arcgis.js         // queryLgaFromCoordinates
-```
-
-That approach helps keep all network/API logic in a centralized place, separating it from the UI.
+- **Action:** Confirm these utilities are well-placed in `utils/api/`. No major changes needed here based on the current component code, but verify the `queryLgaFromCoordinates` import is still necessary.
 
 ### 2. Move Calculation and Formatting Logic
 
-Create dedicated utility files for data transformations and formatting:
+- ✅ Functions already moved:
 
-- Functions to move:
-  - `calculateSummaryStats` (approx. lines 560–610)
-  - `formatDateLong`, `formatDateShort`, `formatCostShort` (approx. lines 840–920)
-  - `getAbbreviatedAppType` (approx. lines 700–710)
+  - `calculateSummaryStats` (moved to `utils/calculations.js`)
+  - `formatDateLong`, `formatDateShort`, `formatCostShort` (moved to `utils/formatters.js`)
+  - `getAbbreviatedAppType` (moved to `utils/formatters.js`)
+
+- Functions still to move:
   - `getDevelopmentType` (approx. lines 1010–1040)
   - `isResidentialType` (approx. lines 550–555)
 

@@ -15,6 +15,7 @@
     "@gi-nx/iframe-sdk": "^0.0.11",
     "@turf/turf": "^6.5.0",
     "@types/file-saver": "^2.0.7",
+    "@types/react-datepicker": "^6.2.0",
     "@vercel/analytics": "^1.5.0",
     "concurrently": "^9.1.2",
     "cors": "^2.8.5",
@@ -26,6 +27,7 @@
     "node-fetch": "^3.3.2",
     "nsw-design-system": "^3.19.0",
     "react": "^18.2.0",
+    "react-datepicker": "^8.3.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.8.0",
     "tailwindcss": "^3.3.5"
