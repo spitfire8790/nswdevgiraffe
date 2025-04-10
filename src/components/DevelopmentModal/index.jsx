@@ -2256,163 +2256,151 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                   </div>
                 </div>
 
-                {/* Table View - independently scrollable with fixed header */}
-                <div className="relative">
-                  <table className="min-w-full divide-y divide-gray-200 table-fixed" style={{ maxWidth: '1000px', tableLayout: 'fixed' }}>
-                      <thead className="bg-gray-50 sticky top-0 z-10">
-                        <tr>
-                          <th 
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-36 bg-gray-50 shadow-sm"
-                            onClick={() => toggleSort('address')}
-                          >
-                            <div className="flex items-center space-x-1 overflow-hidden">
-                              <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                              <span className="truncate">Address</span>
-                              {sortField === 'address' && (
-                                <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
-                              )}
-                            </div>
-                          </th>
-                          <th 
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-36 bg-gray-50 shadow-sm"
-                            onClick={() => toggleSort('type')}
-                          >
-                            <div className="flex items-center space-x-1 overflow-hidden">
-                              <Building className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                              <span className="truncate">Development Type</span>
-                              {sortField === 'type' && (
-                                <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
-                              )}
-                            </div>
-                          </th>
-                          <th 
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-28 bg-gray-50 shadow-sm"
-                            onClick={() => toggleSort('status')}
-                          >
-                            <div className="flex items-center space-x-1">
-                              <Tag className="w-4 h-4 text-gray-400" />
-                              <span>Status</span>
-                              {sortField === 'status' && (
-                                <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
-                              )}
-                            </div>
-                          </th>
-                          <th 
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-28 bg-gray-50 shadow-sm"
-                            onClick={() => toggleSort('applicationType')}
-                          >
-                            <div className="flex items-center space-x-1">
-                              <FileText className="w-4 h-4 text-gray-400" />
-                              <span>Type</span>
-                              {sortField === 'applicationType' && (
-                                <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
-                              )}
-                            </div>
-                          </th>
-                          <th 
-                            className="group px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-20 bg-gray-50 shadow-sm"
-                            onClick={() => toggleSort('cost')}
-                          >
-                            <div className="flex items-center space-x-1">
-                              <DollarSign className="w-4 h-4 text-gray-400" />
-                              <span>Value</span>
-                              {sortField === 'cost' && (
-                                <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
-                              )}
-                            </div>
-                          </th>
-                          <th 
-                            className="group px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-24 bg-gray-50 shadow-sm"
-                            onClick={() => toggleSort('dwellings')}
-                          >
-                            <div className="flex items-center justify-center" title="Dwellings">
-                              <Home className="w-4 h-4 text-gray-400" />
-                              {sortField === 'dwellings' && (
-                                <ArrowUpDown className={`w-3.5 h-3.5 ml-1 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
-                              )}
-                            </div>
-                          </th>
-                          <th 
-                            className="group px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-24 bg-gray-50 shadow-sm"
-                            onClick={() => toggleSort('LodgementDate')}
-                          >
-                            <div className="flex items-center space-x-1">
-                              <Clock className="w-4 h-4 text-gray-400" />
-                              <span>Lodged</span>
-                              {sortField === 'LodgementDate' && (
-                                <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
-                              )}
-                            </div>
-                          </th>
-                        </tr>
-                      </thead>
-                  </table>
-                  
-                  <div className="h-[400px] overflow-auto border-t">
-                    <table className="min-w-full divide-y divide-gray-200 table-fixed" style={{ maxWidth: '1000px', tableLayout: 'fixed' }}>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {getSortedFilteredApplications().map((application) => (
-                          <tr 
-                            key={application.ApplicationId}
-                            onClick={() => application.Location?.[0]?.X && application.Location?.[0]?.Y && 
-                              flyToPoint(application.Location[0].X, application.Location[0].Y)
-                            }
-                            className="cursor-pointer hover:bg-blue-50 transition-colors"
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-normal text-gray-700">
-                              <div className="flex flex-col" title={application.Location?.[0]?.FullAddress}>
-                                <div className="truncate max-w-[180px]">
-                                  {application.Location?.[0]?.StreetNumber1} {application.Location?.[0]?.StreetName} {application.Location?.[0]?.StreetType}
-                                </div>
-                                <div className="text-xs text-gray-400 truncate max-w-[180px]">
-                                  {application.Location?.[0]?.Suburb} {application.Location?.[0]?.Postcode}
-                                </div>
+                {/* Grid View */}
+                <div className="flex flex-col">
+                  {/* Grid Header */}
+                  <div className="grid grid-cols-[2fr_2fr_1.5fr_1fr_1fr_1fr_1.5fr] gap-x-2 bg-gray-50 border-b border-gray-200 sticky top-0 z-10 pr-[17px]"> {/* Added pr-[17px] for scrollbar compensation */}
+                    {/* Address Header */}
+                    <div 
+                      className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 flex items-center space-x-1 overflow-hidden"
+                      onClick={() => toggleSort('address')}
+                    >
+                      <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">Address</span>
+                      {sortField === 'address' && (
+                        <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
+                      )}
+                    </div>
+                    {/* Development Type Header */}
+                    <div 
+                      className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 flex items-center space-x-1 overflow-hidden"
+                      onClick={() => toggleSort('type')}
+                    >
+                      <Building className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">Development Type</span>
+                      {sortField === 'type' && (
+                        <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
+                      )}
+                    </div>
+                    {/* Status Header */}
+                    <div 
+                      className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 flex items-center space-x-1"
+                      onClick={() => toggleSort('status')}
+                    >
+                      <Tag className="w-4 h-4 text-gray-400" />
+                      <span>Status</span>
+                      {sortField === 'status' && (
+                        <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
+                      )}
+                    </div>
+                    {/* Application Type Header */}
+                    <div 
+                      className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 flex items-center space-x-1"
+                      onClick={() => toggleSort('applicationType')}
+                    >
+                      <FileText className="w-4 h-4 text-gray-400" />
+                      <span>Type</span>
+                      {sortField === 'applicationType' && (
+                        <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
+                      )}
+                    </div>
+                    {/* Value Header */}
+                    <div 
+                      className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 flex items-center space-x-1"
+                      onClick={() => toggleSort('cost')}
+                    >
+                      <DollarSign className="w-4 h-4 text-gray-400" />
+                      <span>Value</span>
+                      {sortField === 'cost' && (
+                        <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
+                      )}
+                    </div>
+                    {/* Dwellings Header */}
+                    <div 
+                      className="px-2 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 flex items-center justify-center space-x-1"
+                      onClick={() => toggleSort('dwellings')}
+                    >
+                      <Home className="w-4 h-4 text-gray-400" />
+                      {sortField === 'dwellings' && (
+                        <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
+                      )}
+                    </div>
+                    {/* Lodged Header */}
+                    <div 
+                      className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 flex items-center space-x-1"
+                      onClick={() => toggleSort('LodgementDate')}
+                    >
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <span>Lodged</span>
+                      {sortField === 'LodgementDate' && (
+                        <ArrowUpDown className={`w-3.5 h-3.5 ${sortDirection === 'asc' ? 'text-blue-500' : 'text-blue-500 rotate-180'}`} />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Grid Body - Scrollable */}
+                  <div className="h-[400px] overflow-auto border-t border-gray-200">
+                    {getSortedFilteredApplications().map((application, index) => (
+                      <div 
+                        key={application.ApplicationId}
+                        onClick={() => application.Location?.[0]?.X && application.Location?.[0]?.Y && 
+                          flyToPoint(application.Location[0].X, application.Location[0].Y)
+                        }
+                        className={`grid grid-cols-[2fr_2fr_1.5fr_1fr_1fr_1fr_1.5fr] gap-x-2 cursor-pointer hover:bg-blue-50 transition-colors ${index !== 0 ? 'border-t border-gray-200' : ''}`}
+                      >
+                        {/* Address Cell */}
+                        <div className="px-2 py-2 text-sm font-normal text-gray-700 flex flex-col overflow-hidden" title={application.Location?.[0]?.FullAddress}>
+                          <div className="truncate">
+                            {application.Location?.[0]?.StreetNumber1} {application.Location?.[0]?.StreetName} {application.Location?.[0]?.StreetType}
+                          </div>
+                          <div className="text-xs text-gray-400 truncate">
+                            {application.Location?.[0]?.Suburb} {application.Location?.[0]?.Postcode}
+                          </div>
+                        </div>
+                        {/* Development Type Cell */}
+                        <div className="px-2 py-2 text-sm text-gray-500 flex items-center overflow-hidden">
+                          <div className="flex items-center relative group truncate">
+                            {getDevelopmentType(application)}
+                            {application.DevelopmentType && application.DevelopmentType.length > 1 && (
+                              <div className="absolute left-0 transform -translate-y-2 bottom-full bg-black text-white text-xs rounded-md p-4 opacity-0 group-hover:opacity-100 transition-opacity z-10 w-55 shadow-xl pointer-events-none">
+                                <p className="font-semibold mb-2">Detailed Types:</p>
+                                <ul className="list-disc pl-2 pr-2">
+                                  {application.DevelopmentType.map((type, i) => (
+                                    <li key={i} className="mb-2">
+                                      <span className="inline-block w-full break-words whitespace-normal">{type.DevelopmentType}</span>
+                                    </li>
+                                  ))}
+                                </ul>
                               </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <div className="flex items-center relative group">
-                                {getDevelopmentType(application)}
-                                {application.DevelopmentType && application.DevelopmentType.length > 1 && (
-                                  <div className="absolute left-0 transform -translate-y-2 bottom-full bg-black text-white text-xs rounded-md p-4 opacity-0 group-hover:opacity-100 transition-opacity z-10 w-55 shadow-xl pointer-events-none">
-                                    <p className="font-semibold mb-2">Detailed Types:</p>
-                                    <ul className="list-disc pl-2 pr-2">
-                                      {application.DevelopmentType.map((type, i) => (
-                                        <li key={i} className="mb-2">
-                                          <span className="inline-block w-full break-words whitespace-normal">{type.DevelopmentType}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <div className="flex items-center gap-1.5 relative group">
-                                <StatusIcon status={application.ApplicationStatus} size={14} />
-                                <span className="text-xs text-gray-500">
-                                  {application.ApplicationStatus.length > 10 
-                                    ? `${application.ApplicationStatus.substring(0, 10)}...` 
-                                    : application.ApplicationStatus}
-                                </span>
-                                <div className="absolute left-0 transform -translate-y-2 bottom-full bg-black text-white text-xs rounded-md px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none">
-                                  {application.ApplicationStatus}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getAbbreviatedAppType(application.ApplicationType)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatCostShort(application.CostOfDevelopment)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{application.NumberOfNewDwellings || 0}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <div className="flex items-center">
-                                <span className="whitespace-nowrap">
-                                  {formatDateShort(application.LodgementDate)}
-                                </span>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            )}
+                          </div>
+                        </div>
+                        {/* Status Cell */}
+                        <div className="px-2 py-2 text-sm text-gray-500 flex items-center">
+                          <div className="flex items-center gap-1.5 relative group">
+                            <StatusIcon status={application.ApplicationStatus} size={14} />
+                            <span className="text-xs text-gray-500 truncate">
+                              {application.ApplicationStatus}
+                            </span>
+                            <div className="absolute left-0 transform -translate-y-2 bottom-full bg-black text-white text-xs rounded-md px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none">
+                              {application.ApplicationStatus}
+                            </div>
+                          </div>
+                        </div>
+                        {/* Application Type Cell */}
+                        <div className="px-2 py-2 text-sm text-gray-500 flex items-center">{getAbbreviatedAppType(application.ApplicationType)}</div>
+                        {/* Value Cell */}
+                        <div className="px-2 py-2 text-sm text-gray-500 flex items-center">{formatCostShort(application.CostOfDevelopment)}</div>
+                        {/* Dwellings Cell */}
+                        <div className="px-2 py-2 text-sm text-gray-500 flex items-center justify-center">{application.NumberOfNewDwellings || 0}</div>
+                        {/* Lodged Cell */}
+                        <div className="px-2 py-2 text-sm text-gray-500 flex items-center">
+                          <span className="whitespace-nowrap">
+                            {formatDateShort(application.LodgementDate)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
