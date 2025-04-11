@@ -15,6 +15,149 @@ const STATUS_COLORS = {
   'default': '#666666'       // Grey
 };
 
+/**
+ * Normalizes an address string for comparison
+ * Handles spacing differences, abbreviations, etc.
+ * @param {string} address - The address to normalize
+ * @returns {string} Normalized address
+ */
+const normalizeAddress = (address) => {
+  if (!address) return '';
+  
+  // Convert to lowercase
+  let normalized = address.toLowerCase();
+  
+  // Replace common street type abbreviations
+  const streetTypes = {
+    ' st ': ' street ',
+    ' st': ' street',
+    ' rd ': ' road ',
+    ' rd': ' road',
+    ' ave ': ' avenue ',
+    ' ave': ' avenue',
+    ' ln ': ' lane ',
+    ' ln': ' lane',
+    ' dr ': ' drive ',
+    ' dr': ' drive',
+    ' pl ': ' place ',
+    ' pl': ' place',
+    ' hwy ': ' highway ',
+    ' hwy': ' highway',
+    ' blvd ': ' boulevard ',
+    ' blvd': ' boulevard'
+  };
+  
+  // Apply street type replacements
+  Object.entries(streetTypes).forEach(([abbr, full]) => {
+    normalized = normalized.replace(new RegExp(abbr, 'g'), full);
+  });
+  
+  // Remove punctuation and extra spaces
+  normalized = normalized.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, " ");
+  normalized = normalized.replace(/\s+/g, " ").trim();
+  
+  // Remove unit/suite numbers (like 1/123 or Unit 5, 123)
+  normalized = normalized.replace(/^(?:unit|suite|flat|apt|apartment)\s+\d+[,\s]+/i, "");
+  normalized = normalized.replace(/^\d+\/+/i, "");
+  
+  // Consolidate numbers with hyphens (e.g., "13 - 17" to "13-17")
+  normalized = normalized.replace(/(\d+)\s*-\s*(\d+)/g, "$1-$2");
+  
+  return normalized;
+};
+
+/**
+ * Deduplicates development applications based on address and similarity criteria
+ * Keeps only the most recent application when duplicates are found
+ * @param {Array} applications - Array of development applications
+ * @returns {Array} Deduplicated array of applications
+ */
+export const deduplicateApplications = (applications) => {
+  if (!applications || !Array.isArray(applications) || applications.length === 0) {
+    return [];
+  }
+
+  // Group applications by normalized address
+  const groupedByAddress = {};
+  
+  applications.forEach(app => {
+    const rawAddress = app.Location?.[0]?.FullAddress;
+    if (!rawAddress) return; // Skip if no address
+    
+    // Normalize the address to handle variations
+    const normalizedAddress = normalizeAddress(rawAddress);
+    if (!normalizedAddress) return; // Skip if normalization resulted in empty string
+    
+    if (!groupedByAddress[normalizedAddress]) {
+      groupedByAddress[normalizedAddress] = [];
+    }
+    groupedByAddress[normalizedAddress].push(app);
+  });
+  
+  // Process each address group to find and remove duplicates
+  const deduplicated = [];
+  
+  Object.values(groupedByAddress).forEach(addressGroup => {
+    // If only one application at this address, keep it
+    if (addressGroup.length === 1) {
+      deduplicated.push(addressGroup[0]);
+      return;
+    }
+    
+    // Sort by lodgement date (newest first)
+    addressGroup.sort((a, b) => {
+      const dateA = a.LodgementDate ? new Date(a.LodgementDate) : new Date(0);
+      const dateB = b.LodgementDate ? new Date(b.LodgementDate) : new Date(0);
+      return dateB - dateA;
+    });
+    
+    // Create groups of duplicates based on type, value, or dwellings
+    const duplicateGroups = [];
+    const processed = new Set();
+    
+    for (let i = 0; i < addressGroup.length; i++) {
+      if (processed.has(i)) continue;
+      
+      const app = addressGroup[i];
+      const appType = getTransformedDevelopmentType(app.DevelopmentType);
+      const appValue = app.CostOfDevelopment;
+      const appDwellings = app.NumberOfNewDwellings;
+      
+      const currentGroup = [i];
+      processed.add(i);
+      
+      // Find all duplicates for this app
+      for (let j = i + 1; j < addressGroup.length; j++) {
+        if (processed.has(j)) continue;
+        
+        const otherApp = addressGroup[j];
+        const otherType = getTransformedDevelopmentType(otherApp.DevelopmentType);
+        const otherValue = otherApp.CostOfDevelopment;
+        const otherDwellings = otherApp.NumberOfNewDwellings;
+        
+        // Check if this is a duplicate based on our criteria
+        if (
+          (appType === otherType && appType !== 'Unknown') || 
+          (appValue === otherValue && appValue !== 0 && appValue !== null && appValue !== undefined) ||
+          (appDwellings === otherDwellings && appDwellings !== 0 && appDwellings !== null && appDwellings !== undefined)
+        ) {
+          currentGroup.push(j);
+          processed.add(j);
+        }
+      }
+      
+      duplicateGroups.push(currentGroup);
+    }
+    
+    // Keep only the first (newest) application from each duplicate group
+    duplicateGroups.forEach(group => {
+      deduplicated.push(addressGroup[group[0]]);
+    });
+  });
+  
+  return deduplicated;
+};
+
 // Helper function to check if a development type is residential
 export const isResidentialType = (type) => {
   return RESIDENTIAL_TYPES.has(type);
@@ -80,8 +223,12 @@ export const createDevelopmentLayer = async (
     setProcessedFeatures(0);
   }
   
+  // Deduplicate applications before creating the layer
+  const dedupedApplications = deduplicateApplications(applications);
+  console.log(`Deduplication removed ${applications.length - dedupedApplications.length} duplicate entries`);
+  
   // Categorize applications - simplified version without lensConfig dependency
-  const categorizedApplications = applications.map(app => {
+  const categorizedApplications = dedupedApplications.map(app => {
     // Copy the application to avoid mutating the original
     return { ...app, Category: 'Miscellaneous and Administrative' };
   });

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+
 import { saveAs } from 'file-saver';
 import { 
   FileSpreadsheet,
@@ -6,7 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { rpc } from '@gi-nx/iframe-sdk';
-import { createDevelopmentLayer, removeDevelopmentLayer, getTransformedDevelopmentType } from './mapLayerUtils';
+import { createDevelopmentLayer, removeDevelopmentLayer, getTransformedDevelopmentType, deduplicateApplications } from './mapLayerUtils';
 import { developmentCategories, getDevelopmentCategory, devTypesData } from './developmentTypes';
 import { RESIDENTIAL_TYPES } from './residentialTypes';
 import AnimatedDevLogo from '../../animatedLogo';
@@ -332,8 +333,11 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
 
   // Filter development applications based on all active filters
   const getFilteredApplications = React.useCallback(() => {
+    // First deduplicate the development data
+    const dedupedData = deduplicateApplications(developmentData);
+    
     // Start with applications filtered by the active tab if needed
-    let filtered = activeTab === 'all' ? developmentData : developmentData.filter(app => app.ApplicationStatus === activeTab);
+    let filtered = activeTab === 'all' ? dedupedData : dedupedData.filter(app => app.ApplicationStatus === activeTab);
     
     // Apply development type filter
     if (filters.developmentType) {

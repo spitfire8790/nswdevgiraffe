@@ -3,7 +3,7 @@
  */
 import { fetchLgaBoundary } from './arcgisService';
 // Import mapLayerUtils directly for consistency if needed within createTempDaLayer
-import { getTransformedDevelopmentType, isResidentialType } from '../components/DevelopmentModal/mapLayerUtils'; 
+import { getTransformedDevelopmentType, isResidentialType, deduplicateApplications } from '../components/DevelopmentModal/mapLayerUtils'; 
 import { rpc } from '@gi-nx/iframe-sdk';
 
 // Constant for the temporary layer name
@@ -240,8 +240,12 @@ export const createTempDaLayer = async (rpc, developmentData) => {
       return;
     }
     
+    // Deduplicate development data before creating the layer
+    const dedupedData = deduplicateApplications(developmentData);
+    console.log(`Temp layer deduplication removed ${developmentData.length - dedupedData.length} duplicate entries`);
+    
     // Convert development data to GeoJSON features
-    const features = developmentData
+    const features = dedupedData
       .filter(app => {
         // ... existing filter for valid location ...
         if (!app.Location || !app.Location.length || !app.Location[0]) return false;

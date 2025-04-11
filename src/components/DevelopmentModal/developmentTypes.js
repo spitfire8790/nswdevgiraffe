@@ -49,11 +49,17 @@ export const devTypesData = [
     category: 'Residential Types',
     types: [
       { oldtype: 'Dwelling', newtype: 'Dwelling', secondary: '' },
+      { oldtype: 'Boarding house', newtype: 'Boarding house', secondary: '' },
+      { oldtype: 'Attached dwelling', newtype: '', secondary: '' },
       { oldtype: 'Dwelling house', newtype: 'Dwelling', secondary: '' },
+      { oldtype: 'Co-living', newtype: '', secondary: 'X'},
       { oldtype: 'Secondary dwelling', newtype: '', secondary: 'X' },
       { oldtype: 'Dual occupancy', newtype: 'Dual occupancy', secondary: '' },
+      { oldtype: 'Non-standard Housing', newtype: '', secondary: 'X' }, 
       { oldtype: 'Residential flat building', newtype: 'Apartments', secondary: '' },
       { oldtype: 'Multi-dwelling housing', newtype: 'Multi-dwelling housing', secondary: '' },
+      { oldtype: 'Seniors housing', newtype: '', secondary: '' },
+      { oldtype: 'Semi-attached dwelling', newtype: '', secondary: '' },
       { oldtype: 'Shop top housing', newtype: 'Shop top housing', secondary: '' }
     ]
   },
@@ -62,16 +68,25 @@ export const devTypesData = [
     types: [
       { oldtype: 'Commercial development', newtype: 'Commercial', secondary: '' },
       { oldtype: 'Business premises', newtype: 'Commercial', secondary: '' },
+      { oldtype: 'Registered club', newtype: '', secondary: '' },
       { oldtype: 'Office premises', newtype: 'Office', secondary: '' },
       { oldtype: 'Retail premises', newtype: 'Retail', secondary: '' },
-      { oldtype: 'Shop', newtype: 'Shop', secondary: '' }
+      { oldtype: 'Shop', newtype: 'Shop', secondary: '' },
+      { oldtype: 'Office Premises', newtype: 'Office', secondary: '' }
     ]
   },
   {
     category: 'Food and Beverage',
     types: [
       { oldtype: 'Restaurant or cafe', newtype: 'Food and beverage', secondary: '' },
-      { oldtype: 'Food and drink premises', newtype: 'Food and beverage', secondary: '' }
+      { oldtype: 'Food and drink premises', newtype: 'Food and beverage', secondary: '' },
+      { oldtype: 'Small bar', newtype: '', secondary: '' },
+      { oldtype: 'Pub', newtype: '', secondary: '' },
+      { oldtype: 'Take-away food and drink premises', newtype: 'Take-away food and drink', secondary: 'X' },
+      { oldtype: 'Take-away food and drink', newtype: 'Take-away food and drink', secondary: 'X' },
+      { oldtype: 'Take away food and drink', newtype: 'Take-away food and drink', secondary: 'X' },
+      { oldtype: 'Artisan food and drink industry', newtype: 'Artisan food and drink', secondary: '' },
+      { oldtype: 'Artisinal food and drink', newtype: 'Artisan food and drink', secondary: '' }
     ]
   },
   {
@@ -87,14 +102,17 @@ export const devTypesData = [
     types: [
       { oldtype: 'Health services facility', newtype: 'Health services', secondary: '' },
       { oldtype: 'Medical centre', newtype: 'Medical centre', secondary: '' },
-      { oldtype: 'Hospital', newtype: 'Hospital', secondary: '' }
+      { oldtype: 'Hospital', newtype: 'Hospital', secondary: '' },
+      { oldtype: 'Residential care facility', newtype: '', secondary: '' },
+      { oldtype: 'Health services facilities', newtype: '', secondary: '' }
     ]
   },
   {
     category: 'Recreation and Entertainment',
     types: [
       { oldtype: 'Recreation facility (indoor)', newtype: 'Recreation facility (indoor)', secondary: '' },
-      { oldtype: 'Recreation facility (outdoor)', newtype: 'Recreation facility (outdoor)', secondary: '' }
+      { oldtype: 'Recreation facility (outdoor)', newtype: 'Recreation facility (outdoor)', secondary: '' },
+      { oldtype: 'Recreational Uses', newtype: '', secondary: '' }
     ]
   },
   {

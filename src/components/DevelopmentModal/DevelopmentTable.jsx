@@ -1,7 +1,13 @@
 import React from 'react';
-import { ArrowUpDown } from 'lucide-react';
+import { ArrowUpDown, Info } from 'lucide-react';
 import { StatusIcon } from './statusIcons';
 import { formatCostShort, formatDateShort, getAbbreviatedAppType } from '../../utils/formatters';
+
+// Helper function to truncate text to a specific length
+const truncateText = (text, length = 25) => {
+  if (!text) return '';
+  return text.length > length ? `${text.substring(0, length)}...` : text;
+};
 
 const DevelopmentTable = ({
   getSortedFilteredApplications,
@@ -111,8 +117,8 @@ const DevelopmentTable = ({
                   <div className="flex flex-col" title={application.Location?.[0]?.FullAddress}>
                     <div className="truncate">
                       {(application.Location?.[0]?.StreetNumber1 && application.Location?.[0]?.StreetName) 
-                        ? `${application.Location[0].StreetNumber1} ${application.Location[0].StreetName} ${application.Location[0].StreetType || ''}` 
-                        : application.Location?.[0]?.FullAddress || 'No address available'}
+                        ? truncateText(`${application.Location[0].StreetNumber1} ${application.Location[0].StreetName} ${application.Location[0].StreetType || ''}`)
+                        : truncateText(application.Location?.[0]?.FullAddress || 'No address available')}
                     </div>
                     <div className="text-xs text-gray-400 truncate">
                       {(application.Location?.[0]?.Suburb || application.Location?.[0]?.Postcode) 
@@ -125,17 +131,20 @@ const DevelopmentTable = ({
                 <td className="px-2 py-2 text-sm text-gray-500 align-top">
                   <div className="flex items-center relative group">
                     {getDevelopmentType(application)}
-                    {application.DevelopmentType && application.DevelopmentType.length > 1 && (
-                      <div className="fixed transform bg-black text-white text-xs rounded-md p-3 opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-xl pointer-events-none max-w-xs max-h-64 overflow-y-auto" style={{ top: 'auto', left: 'auto', bottom: 'auto', right: 'auto', transform: 'translate(0, -100%)' }}>
-                        <p className="font-semibold mb-2">Detailed Types:</p>
-                        <ul className="list-disc pl-2 pr-2">
-                          {application.DevelopmentType.map((type, i) => (
-                            <li key={i} className="mb-2">
-                              <span className="inline-block w-full break-words whitespace-normal">{type.DevelopmentType}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                    {application.DevelopmentType && application.DevelopmentType.length > 0 && (
+                      <>
+                        <Info size={12} className="ml-1 text-gray-400" />
+                        <div className="fixed transform bg-black text-white text-xs rounded-md p-3 opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-xl pointer-events-none max-w-xs max-h-64 overflow-y-auto" style={{ position: 'absolute', top: '-5px', left: '100%', transform: 'translateY(-100%)' }}>
+                          <p className="font-semibold mb-2">Detailed Types:</p>
+                          <ul className="list-disc pl-2 pr-2">
+                            {application.DevelopmentType.map((type, i) => (
+                              <li key={i} className="mb-2">
+                                <span className="inline-block w-full break-words whitespace-normal">{type.DevelopmentType}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </>
                     )}
                   </div>
                 </td>
