@@ -110,10 +110,14 @@ const DevelopmentTable = ({
                 <td className="px-2 py-2 text-sm font-normal text-gray-700 align-top">
                   <div className="flex flex-col" title={application.Location?.[0]?.FullAddress}>
                     <div className="truncate">
-                      {application.Location?.[0]?.StreetNumber1} {application.Location?.[0]?.StreetName} {application.Location?.[0]?.StreetType}
+                      {(application.Location?.[0]?.StreetNumber1 && application.Location?.[0]?.StreetName) 
+                        ? `${application.Location[0].StreetNumber1} ${application.Location[0].StreetName} ${application.Location[0].StreetType || ''}` 
+                        : application.Location?.[0]?.FullAddress || 'No address available'}
                     </div>
                     <div className="text-xs text-gray-400 truncate">
-                      {application.Location?.[0]?.Suburb} {application.Location?.[0]?.Postcode}
+                      {(application.Location?.[0]?.Suburb || application.Location?.[0]?.Postcode) 
+                        ? `${application.Location[0].Suburb || ''} ${application.Location[0].Postcode || ''}` 
+                        : ''}
                     </div>
                   </div>
                 </td>

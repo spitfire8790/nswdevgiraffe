@@ -1,6 +1,5 @@
 import React from 'react';
 import { FileDown, Layers } from 'lucide-react';
-import { track } from '@vercel/analytics';
 
 const ActionButtons = ({ 
   handleCreateGeoJSONLayer, 
@@ -13,27 +12,10 @@ const ActionButtons = ({
 }) => {
   if (!hasLoadedData) return null;
   
-  // Wrapped handlers to track button clicks
-  const handleCreateLayerWithTracking = () => {
-    track('Create_Layer', {
-      recordCount: developmentData.length,
-      timestamp: new Date().toISOString()
-    });
-    handleCreateGeoJSONLayer();
-  };
-  
-  const handleDownloadCSVWithTracking = () => {
-    track('Download_CSV', {
-      recordCount: developmentData.length,
-      timestamp: new Date().toISOString()
-    });
-    handleGenerateCSV();
-  };
-  
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={handleCreateLayerWithTracking}
+        onClick={handleCreateGeoJSONLayer}
         disabled={isGeneratingLayer || !developmentData.length}
         className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium 
           ${isGeneratingLayer || !developmentData.length 
@@ -58,7 +40,7 @@ const ActionButtons = ({
       </button>
       
       <button
-        onClick={handleDownloadCSVWithTracking}
+        onClick={handleGenerateCSV}
         disabled={!developmentData.length}
         className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium 
           ${!developmentData.length 

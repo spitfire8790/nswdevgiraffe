@@ -2,7 +2,6 @@ import React from 'react';
 import { RefreshCw, Loader2, ChevronDown } from 'lucide-react';
 import Autocomplete from '../Autocomplete';
 import { getCouncilFromLga } from '../../utils/councilLgaMapping';
-import { track } from '@vercel/analytics';
 
 const LGASelector = ({
   selectedLga,
@@ -17,21 +16,6 @@ const LGASelector = ({
   activeFilterCard,
   setActiveFilterCard
 }) => {
-  
-  // Wrapped handler to track LGA selection
-  const handleChangeLgaWithTracking = () => {
-    // Track the LGA viewed event
-    if (selectedLga) {
-      track('LGA_Viewed', { 
-        lgaName: selectedLga,
-        hasExistingData: hasLoadedData
-      });
-    }
-    
-    // Call the original handler
-    handleChangeLga();
-  };
-  
   return (
     <div className="px-4 py-3 bg-gray-50 border-b flex items-center sticky top-[73px] z-10">
       <div className="flex-1 flex items-center gap-3 flex-wrap">
@@ -80,7 +64,7 @@ const LGASelector = ({
           </div>
         </div>
         <button
-          onClick={handleChangeLgaWithTracking}
+          onClick={handleChangeLga}
           disabled={loading || isChangingLga}
           className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
         >

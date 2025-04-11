@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { rpc } from '@gi-nx/iframe-sdk';
-import { track } from '@vercel/analytics';
 import { createDevelopmentLayer, removeDevelopmentLayer, getTransformedDevelopmentType } from './mapLayerUtils';
 import { developmentCategories, getDevelopmentCategory, devTypesData } from './developmentTypes';
 import { RESIDENTIAL_TYPES } from './residentialTypes';
@@ -31,6 +30,7 @@ import {
   createTempDaLayer,
   removeTempDaLayer
 } from '../../services/lgaMapService';
+import { track } from '@vercel/analytics'
 
 const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = false }) => {
   const [developmentData, setDevelopmentData] = useState([]);
@@ -460,15 +460,6 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
 
   // Handle filter changes
   const setFilter = (filterType, value) => {
-    // Track filter application
-    track('Filters_Applied', {
-      filterType: filterType,
-      filterValue: typeof value === 'object' ? 
-        JSON.stringify(value) : 
-        String(value),
-      totalFiltersActive: activeFilterCount + 1 // +1 because this filter is about to be added
-    });
-    
     setFilters(prev => ({
       ...prev,
       [filterType]: value
@@ -477,11 +468,6 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
   
   // Reset a specific filter
   const resetFilter = (filterType) => {
-    // Track filter removal
-    track('Filter_Removed', {
-      filterType: filterType
-    });
-    
     if (filterType === 'value' || filterType === 'dwellings' || filterType === 'lodgedDate') {
       setFilters(prev => ({
         ...prev,
@@ -497,11 +483,6 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
   
   // Reset all filters
   const resetAllFilters = () => {
-    // Track all filters reset
-    track('All_Filters_Reset', {
-      previousFilterCount: activeFilterCount
-    });
-    
     setFilters({
       developmentType: null,
       status: null,
@@ -801,6 +782,31 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
     const formattedLgaOptions = getAllLgas();
     setLgaOptions(formattedLgaOptions);
   }, []);
+
+  // Add a cleanup effect specifically for page refresh/unload
+  useEffect(() => {
+    // Handler for page refresh or unload
+    const handleBeforeUnload = () => {
+      try {
+        if (rpc) {
+          // Remove all temporary layers when page is refreshed
+          console.log("Page refresh detected: Cleaning up map layers");
+          removeLgaBoundaryLayer(rpc);
+          removeTempDaLayer(rpc);
+        }
+      } catch (error) {
+        console.error('Error during page refresh cleanup:', error);
+      }
+    };
+
+    // Add event listener for page refresh/unload
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Cleanup event listener on component unmount
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [rpc]); // Only depends on rpc which should be stable
 
   const [showInfoModal, setShowInfoModal] = useState(false);
 

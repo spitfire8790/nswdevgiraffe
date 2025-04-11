@@ -1,7 +1,98 @@
 /**
  * Utilities for fetching development application data
  */
-import { track } from '@vercel/analytics/server';
+
+/**
+ * Fetches a single page of development applications with improved error handling
+ * @param {string} API_BASE_URL - The base URL for the API
+ * @param {number} page - The page number to fetch
+ * @param {number} pageSize - The number of records per page
+ * @param {object} apiFilters - The filters to apply to the API request
+ * @returns {Promise<object|null>} - The response data or null if there was an error
+ */
+async function fetchPage(API_BASE_URL, page, pageSize, apiFilters) {
+  const requestBody = {
+    url: 'https://api.apps1.nsw.gov.au/eplanning/data/v0/OnlineDA',
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'PageSize': pageSize.toString(),
+      'PageNumber': page.toString(),
+      'filters': JSON.stringify({ filters: apiFilters })
+    }
+  };
+
+  // Set up abort controller with timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second client-side timeout
+
+  try {
+    console.log(`Starting request for page ${page} with pageSize ${pageSize}`);
+    
+    const response = await fetch(`${API_BASE_URL}${process.env.NODE_ENV === 'development' ? '/api/proxy' : ''}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn(`Failed to fetch page ${page}, status: ${response.status}`, 
+        errorText.substring(0, 200)); // Limit error text
+      return null;
+    }
+
+    // For browsers with ReadableStream support, process as stream
+    if (typeof ReadableStream !== 'undefined' && response.body instanceof ReadableStream) {
+      try {
+        const reader = response.body.getReader();
+        let chunks = [];
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+        
+        // Combine chunks and parse JSON
+        const allChunks = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
+        let position = 0;
+        for (const chunk of chunks) {
+          allChunks.set(chunk, position);
+          position += chunk.length;
+        }
+        
+        const jsonText = new TextDecoder().decode(allChunks);
+        return JSON.parse(jsonText);
+      } catch (streamError) {
+        console.warn(`Error processing stream for page ${page}:`, streamError);
+        return null;
+      }
+    } else {
+      // Fallback for browsers without ReadableStream support
+      try {
+        return await response.json();
+      } catch (jsonError) {
+        console.warn(`Error parsing JSON for page ${page}:`, jsonError);
+        return null;
+      }
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      console.warn(`Request timeout for page ${page} after 30 seconds`);
+    } else {
+      console.warn(`Error fetching page ${page}:`, error);
+    }
+    return null;
+  }
+}
 
 /**
  * Fetches all development applications for a given council
@@ -12,17 +103,13 @@ import { track } from '@vercel/analytics/server';
 export async function fetchAllDAs(councilName, setLoadingProgress) {
   const allDAs = [];
   let pageNumber = 1;
-  const pageSize = 2000; // Increased page size for faster retrieval
+  // Reduced page size to prevent timeouts
+  const pageSize = 500; // Reduced from 2000 to improve reliability
+  let retryCount = 0;
+  const maxRetries = 3;
   
   try {
     console.log(`Fetching DAs for council: ${councilName}`);
-    
-    // Track API request start
-    await track('DA_Fetch_Started', {
-      councilName,
-      pageSize,
-      timestamp: new Date().toISOString()
-    });
     
     const API_BASE_URL = process.env.NODE_ENV === 'development' 
       ? 'http://localhost:3000'
@@ -37,105 +124,49 @@ export async function fetchAllDAs(councilName, setLoadingProgress) {
 
     console.log('Using API filters:', apiFilters);
 
-    const requestBody = {
-      url: 'https://api.apps1.nsw.gov.au/eplanning/data/v0/OnlineDA',
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'PageSize': pageSize.toString(),
-        'PageNumber': pageNumber.toString(),
-        'filters': JSON.stringify({ filters: apiFilters })
-      }
-    };
-
-    console.log('Sending API request to fetch DAs');
+    // Fetch first page using our new fetchPage function
+    const firstPageData = await fetchPage(API_BASE_URL, pageNumber, pageSize, apiFilters);
     
-    try {
-      const response = await fetch(`${API_BASE_URL}${process.env.NODE_ENV === 'development' ? '/api/proxy' : ''}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
+    if (!firstPageData) {
+      throw new Error('Failed to fetch initial page of development applications');
+    }
+    
+    console.log('Received API response:', {
+      totalRecords: firstPageData.TotalRecords || 0,
+      totalPages: firstPageData.TotalPages || 0,
+      applicationCount: firstPageData.Application?.length || 0
+    });
+    
+    // Update loading progress with initial data
+    setLoadingProgress({
+      currentPage: 1,
+      totalPages: firstPageData.TotalPages || 1,
+      loadedDAs: firstPageData.Application?.length || 0,
+      totalDAs: firstPageData.TotalRecords || 0
+    });
+    
+    if (!firstPageData.Application) {
+      console.error('Invalid response format:', firstPageData);
+      throw new Error('Invalid response format from DA API');
+    }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Non-OK response from API:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorText: errorText.substring(0, 200) // Limit error text length to avoid console spam
-        });
-        
-        // Track API error
-        await track('DA_Fetch_Error', {
-          councilName,
-          errorStatus: response.status,
-          errorType: 'API_Response_Error'
-        });
-        
-        throw new Error(`API responded with ${response.status}: ${response.statusText}`);
-      }
+    // Add all applications from the first page
+    allDAs.push(...firstPageData.Application);
 
-      const data = await response.json();
-      console.log('Received API response:', {
-        totalRecords: data.TotalRecords || 0,
-        totalPages: data.TotalPages || 0,
-        applicationCount: data.Application?.length || 0
-      });
+    // Fetch all pages
+    const maxPages = firstPageData.TotalPages || 1;
+    
+    if (maxPages > 1) {
+      console.log(`Fetching ${maxPages - 1} additional pages...`);
       
-      // Update loading progress with initial data
-      setLoadingProgress({
-        currentPage: 1,
-        totalPages: data.TotalPages || 1,
-        loadedDAs: data.Application?.length || 0,
-        totalDAs: data.TotalRecords || 0
-      });
-      
-      // Log a sample response to see the structure
-      if (data?.Application?.length > 0) {
-        console.log('Sample Development Application:', JSON.stringify(data.Application[0], null, 2));
+      // Use sequential fetching with improved retry logic
+      for (let page = 2; page <= maxPages; page++) {
+        let pageData = null;
+        retryCount = 0;
         
-        // Log some key properties for the first few applications
-        const sampleCount = Math.min(3, data.Application.length);
-        console.log(`Sample ${sampleCount} Development Applications:`, 
-          data.Application.slice(0, sampleCount).map(app => ({
-            address: app.Location?.[0]?.FullAddress,
-            status: app.ApplicationStatus,
-            cost: app.CostOfDevelopment,
-            lodgementDate: app.LodgementDate,
-            description: app.DevelopmentDescription,
-            type: app.DevelopmentType?.[0]?.DevelopmentType || 'N/A',
-            coords: app.Location?.[0] ? [app.Location[0].X, app.Location[0].Y] : null
-          }))
-        );
-      }
-
-      if (!data || !data.Application) {
-        console.error('Invalid response format:', data);
-        
-        // Track format error
-        await track('DA_Fetch_Error', {
-          councilName,
-          errorType: 'Invalid_Response_Format'
-        });
-        
-        throw new Error('Invalid response format from DA API');
-      }
-
-      // Add all applications from this page
-      allDAs.push(...data.Application);
-
-      // Fetch all pages as requested (no cap)
-      const maxPages = data.TotalPages || 1;
-      
-      if (maxPages > 1) {
-        console.log(`Fetching ${maxPages - 1} additional pages...`);
-        
-        // Use sequential fetching instead of Promise.all to prevent rate limiting
-        for (let page = 2; page <= maxPages; page++) {
-          console.log(`Fetching page ${page}/${maxPages}...`);
+        // Try up to maxRetries times with exponential backoff
+        while (!pageData && retryCount < maxRetries) {
+          console.log(`Fetching page ${page}/${maxPages}${retryCount > 0 ? ` (attempt ${retryCount + 1})` : ''}...`);
           
           // Update current page in loading progress
           setLoadingProgress(prev => ({
@@ -143,100 +174,40 @@ export async function fetchAllDAs(councilName, setLoadingProgress) {
             currentPage: page
           }));
           
-          try {
-            const pageResponse = await fetch(`${API_BASE_URL}${process.env.NODE_ENV === 'development' ? '/api/proxy' : ''}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              },
-              body: JSON.stringify({
-                url: 'https://api.apps1.nsw.gov.au/eplanning/data/v0/OnlineDA',
-                method: 'GET',
-                headers: {
-                  'Accept': 'application/json',
-                  'PageSize': pageSize.toString(),
-                  'PageNumber': page.toString(),
-                  'filters': JSON.stringify({ filters: apiFilters })
-                }
-              })
-            });
-            
-            if (!pageResponse.ok) {
-              console.warn(`Failed to fetch page ${page}, continuing with data we have`);
-              
-              // Track page fetch error
-              await track('DA_Page_Fetch_Error', {
-                councilName,
-                pageNumber: page,
-                errorStatus: pageResponse.status
-              });
-              
-              continue;
-            }
-            
-            const pageData = await pageResponse.json();
-            
-            if (pageData?.Application) {
-              allDAs.push(...pageData.Application);
-              console.log(`Added ${pageData.Application.length} applications from page ${page}`);
-              
-              // Update loading progress with new count
-              setLoadingProgress(prev => ({
-                ...prev,
-                loadedDAs: allDAs.length
-              }));
-            }
-            
-            // Minimal delay between requests while still avoiding rate limiting
-            await new Promise(resolve => setTimeout(resolve, 50));
-            
-          } catch (pageError) {
-            console.warn(`Error fetching page ${page}, skipping:`, pageError);
-            
-            // Track page fetch error
-            await track('DA_Page_Fetch_Error', {
-              councilName,
-              pageNumber: page,
-              errorMessage: pageError.message
-            });
-            
-            // Continue with the data we have
+          pageData = await fetchPage(API_BASE_URL, page, pageSize, apiFilters);
+          
+          if (!pageData && retryCount < maxRetries - 1) {
+            // Calculate backoff delay: 1s, 2s, 4s, etc.
+            const backoffDelay = Math.pow(2, retryCount) * 1000;
+            console.log(`Retrying page ${page} after ${backoffDelay}ms delay...`);
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+            retryCount++;
+          } else if (!pageData) {
+            console.warn(`Failed to fetch page ${page} after ${maxRetries} attempts, continuing with data we have`);
+            break;
           }
         }
+        
+        if (pageData?.Application) {
+          allDAs.push(...pageData.Application);
+          console.log(`Added ${pageData.Application.length} applications from page ${page}`);
+          
+          // Update loading progress with new count
+          setLoadingProgress(prev => ({
+            ...prev,
+            loadedDAs: allDAs.length
+          }));
+        }
+        
+        // Increased delay between requests to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-    } catch (fetchError) {
-      console.error('Error during API fetch:', fetchError);
-      
-      // Track fetch error
-      await track('DA_Fetch_Error', {
-        councilName,
-        errorMessage: fetchError.message,
-        errorType: 'Fetch_Error'
-      });
-      
-      throw fetchError;
     }
-
-    // Track successful fetch completion
-    await track('DA_Fetch_Completed', {
-      councilName,
-      recordCount: allDAs.length,
-      pagesFetched: maxPages || 1
-    });
 
     console.log(`Successfully fetched ${allDAs.length} DAs`);
     return allDAs;
   } catch (error) {
     console.error('Error fetching DAs:', error);
-    
-    // Track overall fetch error
-    await track('DA_Fetch_Error', {
-      councilName,
-      errorMessage: error.message,
-      errorType: 'Overall_Error'
-    });
-    
     throw error; // Re-throw so the UI can show error state
   }
 }
