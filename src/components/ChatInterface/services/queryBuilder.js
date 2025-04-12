@@ -61,6 +61,12 @@ class QueryBuilder {
     // Remove duplicates
     const uniqueSearchTerms = [...new Set(searchTerms)];
 
+    // Create council document references if available
+    let councilDocumentURL = "";
+    if (daData.LGA === "RYDE" && daData.CouncilReference) {
+      councilDocumentURL = `https://cmweb.ryde.nsw.gov.au/KapishWebGrid/default.aspx?s=DATracker&containerex=${daData.CouncilReference}/0010`;
+    }
+
     // Create the structured query
     let structuredQuery = userQuery || "Find public information about this property";
 
@@ -76,15 +82,27 @@ class QueryBuilder {
 • Value: ${daData.CostOfDevelopment ? `$${daData.CostOfDevelopment.toLocaleString()}` : "Unknown"}
 • New Dwellings: ${daData.NumberOfNewDwellings || "0"}
 • Date: ${daData.LodgementDate || ""}
+${councilDocumentURL ? `• Council Documents URL: ${councilDocumentURL}` : ""}
+• CouncilReference: ${daData.CouncilReference || "Unknown"}
+• LGA: ${daData.LGA || "Unknown"}
 
-Please search for public information about this property and development application. Focus on:
-1. Environmental factors (flooding, bushfire, contamination)
-2. Zoning and planning concerns or advantages
-3. Community feedback (objections, support)
-4. Infrastructure and services
-5. Historical significance
+You have access to web browsing capabilities. Use them to search for detailed information about this property and development application. Please:
 
-For each finding, indicate the sentiment (positive/neutral/negative) and categorize the information. Provide reference links where available.`;
+1. Perform Google searches using the property address and relevant search terms
+2. If a Council Documents URL is provided, visit it to access official DA documents 
+3. Research specific environmental factors relevant to this property (flooding, bushfire, contamination risks)
+4. Find zoning information and planning regulations that apply to this property
+5. Look for community feedback, objections, or support for this development
+6. Research infrastructure and services information relevant to this location
+7. Check for any historical significance of the property or area
+
+Provide specific, factual information rather than general statements. For each finding:
+- Indicate the sentiment (positive/neutral/negative)
+- Categorize the information (Environmental, Planning, Community, Infrastructure, Historical)
+- Include reference links to your sources
+- If you use the Council Documents URL, mention which specific documents you accessed
+
+DO NOT state that you cannot browse the web or access external documents. Use your web browsing capabilities to find the information requested.`;
 
     return structuredQuery;
   }

@@ -49,39 +49,74 @@ class GeminiService {
 
     try {
       // Log the prompt for debugging
-      console.log('Sending prompt to Gemini API:', prompt.substring(0, 150) + '...');
+      console.log('Sending prompt to ADK Agent Backend:', prompt.substring(0, 150) + '...');
       
       // Combine message history with current query
       const history = [...messageHistory];
       
-      // Send the request to our backend proxy
-      const response = await fetch('/api/gemini/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt,
-          history: history,
-        }),
-      });
+      try {
+        // Try using the ADK backend first
+        const response = await fetch('/api/agent/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt,
+            history: history,
+          }),
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        throw new Error(`Failed to generate response from Gemini API: ${response.status} ${response.statusText}`);
-      }
+        if (!response.ok) {
+          console.log('ADK backend error, falling back to direct Gemini API...');
+          throw new Error(`ADK backend error: ${response.status}`);
+        }
 
-      const data = await response.json();
-      
-      // Log a preview of the response for debugging
-      if (data.text) {
-        console.log('Received response from Gemini API:', data.text.substring(0, 150) + '...');
+        const data = await response.json();
+        
+        // Log a preview of the response for debugging
+        if (data.text) {
+          console.log('Received response from ADK Agent:', data.text.substring(0, 150) + '...');
+          
+          // Log sources if available
+          if (data.sources && data.sources.length > 0) {
+            console.log('Sources:', data.sources);
+          }
+        }
+        
+        return data;
+      } catch (adkError) {
+        // If ADK backend fails, fall back to direct Gemini API
+        console.log('Falling back to direct Gemini API due to error:', adkError.message);
+        
+        // Send the request to the Express proxy server that directly calls Gemini API
+        const fallbackResponse = await fetch('/api/gemini/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt,
+            history: history,
+          }),
+        });
+
+        if (!fallbackResponse.ok) {
+          console.error('Fallback API Error:', await fallbackResponse.text());
+          throw new Error(`Failed to generate response from fallback: ${fallbackResponse.status}`);
+        }
+
+        const fallbackData = await fallbackResponse.json();
+        console.log('Received fallback response from Gemini API');
+        
+        return {
+          success: true,
+          text: fallbackData.text,
+          sources: [] // No sources available in fallback mode
+        };
       }
-      
-      return data;
     } catch (error) {
-      console.error('Error generating response from Gemini API:', error);
+      console.error('Error generating response:', error);
       throw error;
     }
   }

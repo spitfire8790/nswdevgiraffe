@@ -4,11 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run proxy\" \"vite\"",
+    "dev": "concurrently \"npm run proxy\" \"npm run python-backend\" \"vite\"",
     "dev:vite": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "proxy": "node server.js",
+    "python-backend": "start-python-backend.bat",
     "vercel-build": "vite build"
   },
   "dependencies": {
@@ -20,7 +21,6 @@
     "@types/react-datepicker": "^6.2.0",
     "@vercel/analytics": "^1.5.0",
     "@vercel/speed-insights": "^1.2.0",
-    "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.18.2",
@@ -40,6 +40,7 @@
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.3",
     "autoprefixer": "^10.4.16",
+    "concurrently": "^9.1.2",
     "postcss": "^8.4.31",
     "vite": "^4.4.5"
   },

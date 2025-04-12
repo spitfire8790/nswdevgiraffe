@@ -115,7 +115,7 @@ const ChatInterface = ({ daData, isOpen, onClose }) => {
     <div className={`fixed bottom-4 right-4 z-50 transition-all duration-300 ${
       isMinimized 
         ? 'w-auto h-auto' 
-        : 'w-[400px] h-[500px] max-h-[80vh]'
+        : 'w-[800px] h-[700px] max-h-[90vh]'
     }`}>
       {/* Minimized state - just show icon */}
       {isMinimized ? (

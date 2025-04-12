@@ -79,7 +79,18 @@ export const handleGenerate = async (req, res) => {
     // Create model and generate content using the models API
     const result = await genAI.models.generateContent({
       model: "gemini-2.0-flash",
-      contents: prompt
+      contents: prompt,
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.8,
+        topK: 40,
+        maxOutputTokens: 8192
+      },
+      tools: [{
+        googleSearch: {
+          enable: true
+        }
+      }]
     });
     
     const text = result.response.text();
