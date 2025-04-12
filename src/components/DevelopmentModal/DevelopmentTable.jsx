@@ -15,7 +15,9 @@ const DevelopmentTable = ({
   sortField,
   sortDirection,
   flyToPoint,
-  getDevelopmentType
+  getDevelopmentType,
+  selectDA,
+  selectedDA
 }) => {
   return (
     <div className="mt-4 bg-white rounded-lg border shadow-sm overflow-hidden">
@@ -107,10 +109,17 @@ const DevelopmentTable = ({
             {getSortedFilteredApplications().map(application => (
               <tr 
                 key={application.ApplicationId}
-                onClick={() => application.Location?.[0]?.X && application.Location?.[0]?.Y && 
-                  flyToPoint(application.Location[0].X, application.Location[0].Y)
-                }
-                className="cursor-pointer hover:bg-blue-50 transition-colors"
+                onClick={() => {
+                  if (application.Location?.[0]?.X && application.Location?.[0]?.Y) {
+                    flyToPoint(application.Location[0].X, application.Location[0].Y);
+                  }
+                  selectDA(application);
+                }}
+                className={`cursor-pointer transition-colors ${
+                  selectedDA && selectedDA.ApplicationId === application.ApplicationId 
+                    ? 'bg-blue-100 hover:bg-blue-200' 
+                    : 'hover:bg-blue-50'
+                }`}
               >
                 {/* Address Cell */}
                 <td className="px-2 py-2 text-sm font-normal text-gray-700 align-top">

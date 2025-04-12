@@ -1,14 +1,17 @@
 import React from 'react';
-import { FileDown, Layers } from 'lucide-react';
+import { FileDown, Layers, MessageSquare } from 'lucide-react';
 
 const ActionButtons = ({ 
   handleCreateGeoJSONLayer, 
   handleGenerateCSV, 
+  toggleChat,
+  isChatOpen,
   isGeneratingLayer,
   developmentData, 
   processedFeatures, 
   totalFeatures,
-  hasLoadedData
+  hasLoadedData,
+  selectedDA
 }) => {
   if (!hasLoadedData) return null;
   
@@ -49,6 +52,22 @@ const ActionButtons = ({
       >
         <FileDown size={14} />
         <span>Download CSV</span>
+      </button>
+      
+      {/* AI Chat button */}
+      <button
+        onClick={toggleChat}
+        disabled={!developmentData.length || !selectedDA}
+        className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium 
+          ${!developmentData.length || !selectedDA
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+            : isChatOpen
+              ? 'bg-purple-700 text-white hover:bg-purple-800' 
+              : 'bg-purple-600 text-white hover:bg-purple-700'}`}
+        title={!selectedDA ? "Select a development application first" : "Ask AI about this development application"}
+      >
+        <MessageSquare size={14} />
+        <span>{isChatOpen ? 'Close Chat' : 'Ask AI'}</span>
       </button>
     </div>
   );

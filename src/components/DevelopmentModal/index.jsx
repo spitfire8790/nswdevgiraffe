@@ -4,6 +4,7 @@ import { saveAs } from 'file-saver';
 import { 
   FileSpreadsheet,
   Loader2,
+  MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { rpc } from '@gi-nx/iframe-sdk';
@@ -32,6 +33,7 @@ import {
   removeTempDaLayer
 } from '../../services/lgaMapService';
 import { track } from '@vercel/analytics'
+import ChatInterface from '../ChatInterface';
 
 const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = false }) => {
   const [developmentData, setDevelopmentData] = useState([]);
@@ -91,6 +93,11 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
     if (filters.lodgedDate.operator) count++;
     return count;
   }, [filters]);
+
+  // Add state for chat interface
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  // Add state for selected DA
+  const [selectedDA, setSelectedDA] = useState(null);
 
   // Function to fetch development application data
   const fetchDevelopmentData = async (lgaNameToFetch) => {
@@ -812,7 +819,33 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
     };
   }, [rpc]); // Only depends on rpc which should be stable
 
-  const [showInfoModal, setShowInfoModal] = useState(false);
+  // Toggle the chat interface
+  const toggleChat = () => {
+    // Only allow opening chat if a DA is selected
+    if (!isChatOpen && !selectedDA) {
+      alert("Please select a specific development application first");
+      return;
+    }
+    
+    setIsChatOpen(prev => !prev);
+    
+    // Track chat usage
+    track('toggle_property_chat', {
+      action: !isChatOpen ? 'open' : 'close',
+      lga: selectedLga
+    });
+  };
+
+  // Add a function to select a DA
+  const selectDA = (da) => {
+    setSelectedDA(da);
+    // If chat is open, update the chat with the newly selected DA
+    if (isChatOpen) {
+      // Force chat to refresh with new DA data
+      setIsChatOpen(false);
+      setTimeout(() => setIsChatOpen(true), 100);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -843,11 +876,14 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
               <ActionButtons 
                 handleCreateGeoJSONLayer={handleCreateGeoJSONLayer}
                 handleGenerateCSV={handleGenerateCSV}
+                toggleChat={toggleChat}
+                isChatOpen={isChatOpen}
                 isGeneratingLayer={isGeneratingLayer}
                 developmentData={developmentData}
                 processedFeatures={processedFeatures}
                 totalFeatures={totalFeatures}
                 hasLoadedData={hasLoadedData}
+                selectedDA={selectedDA}
               />
             </div>
 
@@ -967,12 +1003,23 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                   sortDirection={sortDirection}
                   flyToPoint={flyToPoint}
                   getDevelopmentType={getDevelopmentType}
+                  selectDA={selectDA}  // Pass the selectDA function
+                  selectedDA={selectedDA}  // Pass the selected DA
                 />
               </div>
             )}
             </div>
           </motion.div>
         </div>
+      )}
+      
+      {/* Chat interface component */}
+      {isOpen && hasLoadedData && (
+        <ChatInterface 
+          isOpen={isChatOpen} 
+          onClose={() => setIsChatOpen(false)}
+          daData={selectedDA}
+        />
       )}
     </AnimatePresence>
   );

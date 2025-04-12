@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import * as dotenv from 'dotenv';
 import https from 'https';
+import { GoogleGenAI } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -53,6 +54,143 @@ app.post('/api/proxy', async (req, res) => {
     res.status(500).send({
       error: 'Proxy server error',
       message: error.message
+    });
+  }
+});
+
+// Gemini API initialization endpoint
+app.get('/api/gemini/initialize', (req, res) => {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'GEMINI_API_KEY is not defined in environment variables' 
+      });
+    }
+    
+    // Just check if we can initialize the client
+    const genAI = new GoogleGenAI({ apiKey });
+    
+    res.status(200).json({
+      success: true,
+      message: 'Gemini API client initialized successfully'
+    });
+  } catch (error) {
+    console.error('Error initializing Gemini API:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to initialize Gemini API client',
+      error: error.message
+    });
+  }
+});
+
+// Gemini API generate endpoint
+app.post('/api/gemini/generate', async (req, res) => {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'GEMINI_API_KEY is not defined in environment variables' 
+      });
+    }
+    
+    const { prompt, history = [] } = req.body;
+    
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Prompt is required'
+      });
+    }
+    
+    // Initialize the Gemini API client
+    const genAI = new GoogleGenAI({ apiKey });
+    
+    // Format history for the new API
+    const formattedHistory = history.map(msg => ({
+      role: msg.role,
+      parts: [{ text: msg.parts[0].text }]
+    }));
+    
+    // Use the chat functionality with the new API
+    if (history && history.length > 0) {
+      // If we have history, use it
+      try {
+        const result = await genAI.models.generateContent({
+          model: "gemini-2.0-flash",
+          contents: prompt
+        });
+        
+        console.log('API Response:', JSON.stringify(result).substring(0, 200));
+        
+        // Check different potential response formats
+        let text;
+        if (result && result.response && typeof result.response.text === 'function') {
+          text = result.response.text();
+        } else if (result && result.text && typeof result.text === 'function') {
+          text = result.text();
+        } else if (result && result.candidates && result.candidates[0]) {
+          text = result.candidates[0].content.parts[0].text;
+        } else if (typeof result === 'string') {
+          text = result;
+        } else {
+          console.log('Unexpected response format:', result);
+          throw new Error('Unexpected response format from Gemini API');
+        }
+        
+        res.status(200).json({
+          success: true,
+          text: text
+        });
+      } catch (error) {
+        console.error('History chat error:', error);
+        throw error;
+      }
+    } else {
+      // If no history, use a simple generateContent call
+      try {
+        const result = await genAI.models.generateContent({
+          model: "gemini-2.0-flash",
+          contents: prompt
+        });
+        
+        console.log('API Response:', JSON.stringify(result).substring(0, 200));
+        
+        // Check different potential response formats
+        let text;
+        if (result && result.response && typeof result.response.text === 'function') {
+          text = result.response.text();
+        } else if (result && result.text && typeof result.text === 'function') {
+          text = result.text();
+        } else if (result && result.candidates && result.candidates[0]) {
+          text = result.candidates[0].content.parts[0].text;
+        } else if (typeof result === 'string') {
+          text = result;
+        } else {
+          console.log('Unexpected response format:', result);
+          throw new Error('Unexpected response format from Gemini API');
+        }
+        
+        res.status(200).json({
+          success: true,
+          text: text
+        });
+      } catch (error) {
+        console.error('Simple generate error:', error);
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error('Error generating response from Gemini API:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate response',
+      error: error.message
     });
   }
 });
