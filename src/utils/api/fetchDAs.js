@@ -205,6 +205,10 @@ export async function fetchAllDAs(councilName, setLoadingProgress) {
     }
 
     console.log(`Successfully fetched ${allDAs.length} DAs`);
+    // Add this log to show the first DA object as a sample
+    if (allDAs.length > 0) {
+      console.log('Sample DA object:', allDAs[0]);
+    }
     return allDAs;
   } catch (error) {
     console.error('Error fetching DAs:', error);

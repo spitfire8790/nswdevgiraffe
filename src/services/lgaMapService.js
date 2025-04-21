@@ -10,8 +10,6 @@ import { rpc } from '@gi-nx/iframe-sdk';
 const LGA_BOUNDARY_LAYER = 'lga-boundary-layer';
 const DA_TEMP_LAYER = 'da-temp-layer';
 
-// Store full development data in memory for filtering - REMOVED
-// let fullDevelopmentData = []; // REMOVED
 
 // Constants for application status colors - simplified to all blue with white stroke
 const STATUS_COLORS = {

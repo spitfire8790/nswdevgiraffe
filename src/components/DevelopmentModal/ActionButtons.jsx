@@ -4,6 +4,7 @@ import { FileDown, Layers } from 'lucide-react';
 const ActionButtons = ({ 
   handleCreateGeoJSONLayer, 
   handleGenerateCSV, 
+  handleGenerateJSON,
   isGeneratingLayer,
   developmentData, 
   processedFeatures, 
@@ -49,6 +50,18 @@ const ActionButtons = ({
       >
         <FileDown size={14} />
         <span>Download CSV</span>
+      </button>
+
+      <button
+        onClick={handleGenerateJSON}
+        disabled={!developmentData.length}
+        className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium 
+          ${!developmentData.length 
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+            : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+      >
+        <FileDown size={14} />
+        <span>Download JSON</span>
       </button>
     </div>
   );

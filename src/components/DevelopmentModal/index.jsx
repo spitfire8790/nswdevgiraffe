@@ -773,9 +773,40 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
       console.log(`CSV exported successfully: ${filename}`);
     } catch (error) {
       console.error('Error generating CSV:', error);
-      setError(`Error generating CSV: ${error.message}`);
+      setError('Failed to generate CSV file');
     }
   };
+
+  // --- Add new function to handle JSON generation ---
+  const handleGenerateJSON = () => {
+    try {
+      const councilName = selectedLga || 'Unknown';
+      const currentDate = new Date();
+      const day = currentDate.getDate();
+      const month = currentDate.toLocaleString('en-US', { month: 'long' });
+      const year = currentDate.getFullYear();
+      const formattedDate = `${day} ${month} ${year}`;
+      const filename = `DA - ${councilName} - ${formattedDate}.json`;
+
+      // Get filtered applications (same as CSV export)
+      const filteredApps = getFilteredApplications();
+
+      // Convert data to JSON string (pretty-printed)
+      const jsonString = JSON.stringify(filteredApps, null, 2); 
+
+      // Create a Blob and trigger download using file-saver
+      const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
+      saveAs(blob, filename);
+
+      // Track the event
+      track('Export_JSON', { lga: councilName, count: filteredApps.length });
+
+    } catch (error) {
+      console.error('Error generating JSON:', error);
+      setError('Failed to generate JSON file');
+    }
+  };
+  // --- End of new function ---
 
   // Get LGA options for dropdown
   const [lgaOptions, setLgaOptions] = useState([]);
@@ -843,6 +874,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
               <ActionButtons 
                 handleCreateGeoJSONLayer={handleCreateGeoJSONLayer}
                 handleGenerateCSV={handleGenerateCSV}
+                handleGenerateJSON={handleGenerateJSON}
                 isGeneratingLayer={isGeneratingLayer}
                 developmentData={developmentData}
                 processedFeatures={processedFeatures}
