@@ -29,7 +29,8 @@ import {
   displayLgaBoundary, 
   removeLgaBoundaryLayer,
   createTempDaLayer,
-  removeTempDaLayer
+  removeTempDaLayer,
+  removeAllTempLayers
 } from '../../services/lgaMapService';
 import { track } from '@vercel/analytics'
 
@@ -842,6 +843,19 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [rpc]); // Only depends on rpc which should be stable
+
+  // Remove all temp layers on unmount (e.g., when switching SDK apps)
+  useEffect(() => {
+    console.log('[DEBUG] Setting up unmount cleanup for temp layers');
+    return () => {
+      console.log('[DEBUG] Unmounting: removing all temp layers. rpc:', rpc);
+      if (rpc) {
+        removeAllTempLayers(rpc);
+      } else {
+        console.warn('[DEBUG] rpc is not available during unmount cleanup');
+      }
+    };
+  }, [rpc]);
 
   const [showInfoModal, setShowInfoModal] = useState(false);
 

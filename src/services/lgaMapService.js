@@ -92,8 +92,8 @@ export const displayLgaBoundary = async (rpc, lgaName) => {
     // Add temporary layers using rpc.invoke and don't wait for them to complete
     // before calculating the bounds
     const addLayersPromise = Promise.all([
-      rpc.invoke('addTempLayer', [LGA_BOUNDARY_LAYER, style, null, true, 0.8]),
-      rpc.invoke('addTempLayer', [`${LGA_BOUNDARY_LAYER}-outline`, outlineStyle, null, true, 1.0])
+      rpc.invoke('addTempLayer', [LGA_BOUNDARY_LAYER, style, null, false, 0.8]),
+      rpc.invoke('addTempLayer', [`${LGA_BOUNDARY_LAYER}-outline`, outlineStyle, null, false, 1.0])
     ]);
     
     // If we have bounds, fly to them immediately without waiting for layers to be added
@@ -357,7 +357,7 @@ export const createTempDaLayer = async (rpc, developmentData) => {
     };
     
     // Add the temporary layer
-    await rpc.invoke('addTempLayer', [DA_TEMP_LAYER, style, null, true, 1.0]);
+    await rpc.invoke('addTempLayer', [DA_TEMP_LAYER, style, null, false, 1.0]);
     console.log(`Added temporary DA layer: ${DA_TEMP_LAYER} with ${features.length} applications`);
     
   } catch (error) {

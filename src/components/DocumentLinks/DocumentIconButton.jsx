@@ -10,15 +10,15 @@ import { lgaMapping } from '../../utils/councilLgaMapping';
 const DocumentIconButton = ({ reference, lgaName, onShowModal }) => {
   // Only show the document icon if we have a reference and a handler is available for this council
   if (!reference || !lgaName) return null;
-  
+
   // Check if we have a handler for this council by trying to get a URL
   const hasHandler = !!getDocumentsUrl(reference, lgaName);
   if (!hasHandler) return null;
-  
+
   const handleClick = (e) => {
     // Stop event propagation to prevent parent click handlers from firing
     e.stopPropagation();
-    
+
     // Get the documents URL
     const documentsUrl = getDocumentsUrl(reference, lgaName);
     if (!documentsUrl) {
@@ -36,9 +36,9 @@ const DocumentIconButton = ({ reference, lgaName, onShowModal }) => {
       onShowModal(documentsUrl, reference);
     }
   };
-  
+
   return (
-    <button 
+    <button
       onClick={handleClick}
       className="text-blue-600 hover:text-blue-800 transition-colors focus:outline-none"
       title="View Council Documents"

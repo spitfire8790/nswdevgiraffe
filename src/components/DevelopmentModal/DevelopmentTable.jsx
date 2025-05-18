@@ -22,9 +22,9 @@ const DevelopmentTable = ({
   const [modalOpen, setModalOpen] = useState(false);
   const [documentUrl, setDocumentUrl] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
-  
+
   const applications = getSortedFilteredApplications();
-  
+
   // Check if any application has a valid document handler
   const hasAnyDocumentHandler = useMemo(() => {
     return applications.some(app => {
@@ -45,8 +45,8 @@ const DevelopmentTable = ({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
-                <th 
-                  scope="col" 
+                <th
+                  scope="col"
                   className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => toggleSort('address')}
                 >
@@ -57,8 +57,8 @@ const DevelopmentTable = ({
                     )}
                   </div>
                 </th>
-                <th 
-                  scope="col" 
+                <th
+                  scope="col"
                   className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => toggleSort('type')}
                 >
@@ -69,8 +69,8 @@ const DevelopmentTable = ({
                     )}
                   </div>
                 </th>
-                <th 
-                  scope="col" 
+                <th
+                  scope="col"
                   className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => toggleSort('status')}
                 >
@@ -81,14 +81,14 @@ const DevelopmentTable = ({
                     )}
                   </div>
                 </th>
-                <th 
-                  scope="col" 
+                <th
+                  scope="col"
                   className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   App Type
                 </th>
-                <th 
-                  scope="col" 
+                <th
+                  scope="col"
                   className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => toggleSort('cost')}
                 >
@@ -99,8 +99,8 @@ const DevelopmentTable = ({
                     )}
                   </div>
                 </th>
-                <th 
-                  scope="col" 
+                <th
+                  scope="col"
                   className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => toggleSort('dwellings')}
                 >
@@ -111,8 +111,8 @@ const DevelopmentTable = ({
                     )}
                   </div>
                 </th>
-                <th 
-                  scope="col" 
+                <th
+                  scope="col"
                   className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => toggleSort('LodgementDate')}
                 >
@@ -125,8 +125,8 @@ const DevelopmentTable = ({
                 </th>
                 {/* Only show Docs column if at least one application has a document handler */}
                 {hasAnyDocumentHandler && (
-                  <th 
-                    scope="col" 
+                  <th
+                    scope="col"
                     className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
                     Docs
@@ -136,9 +136,9 @@ const DevelopmentTable = ({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200 text-sm">
               {applications.map(application => (
-                <tr 
+                <tr
                   key={application.ApplicationId}
-                  onClick={() => application.Location?.[0]?.X && application.Location?.[0]?.Y && 
+                  onClick={() => application.Location?.[0]?.X && application.Location?.[0]?.Y &&
                     flyToPoint(application.Location[0].X, application.Location[0].Y)
                   }
                   className="cursor-pointer hover:bg-blue-50 transition-colors"
@@ -147,13 +147,13 @@ const DevelopmentTable = ({
                   <td className="px-2 py-2 text-sm font-normal text-gray-700 align-top">
                     <div className="flex flex-col" title={application.Location?.[0]?.FullAddress}>
                       <div className="truncate">
-                        {(application.Location?.[0]?.StreetNumber1 && application.Location?.[0]?.StreetName) 
+                        {(application.Location?.[0]?.StreetNumber1 && application.Location?.[0]?.StreetName)
                           ? truncateText(`${application.Location[0].StreetNumber1} ${application.Location[0].StreetName} ${application.Location[0].StreetType || ''}`)
                           : truncateText(application.Location?.[0]?.FullAddress || 'No address available')}
                       </div>
                       <div className="text-xs text-gray-400 truncate">
-                        {(application.Location?.[0]?.Suburb || application.Location?.[0]?.Postcode) 
-                          ? `${application.Location[0].Suburb || ''} ${application.Location[0].Postcode || ''}` 
+                        {(application.Location?.[0]?.Suburb || application.Location?.[0]?.Postcode)
+                          ? `${application.Location[0].Suburb || ''} ${application.Location[0].Postcode || ''}`
                           : ''}
                       </div>
                     </div>
@@ -204,7 +204,7 @@ const DevelopmentTable = ({
                   {/* Documents Cell - only shown if at least one application has a document handler */}
                   {hasAnyDocumentHandler && (
                     <td className="px-2 py-2 text-sm text-center align-top">
-                      <DocumentIconButton 
+                      <DocumentIconButton
                         reference={application.CouncilApplicationNumber}
                         lgaName={application.Council?.CouncilName}
                         onShowModal={handleShowModal}
@@ -217,9 +217,9 @@ const DevelopmentTable = ({
           </table>
         </div>
       </div>
-      
+
       {/* Document Links Modal */}
-      <DocumentLinksModal 
+      <DocumentLinksModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         documentUrl={documentUrl}

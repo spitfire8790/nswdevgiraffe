@@ -4,6 +4,7 @@ import { validateGeoJSON } from '../../utils/mapUtils';
 import { formatCurrency } from '../../utils/formatters';
 import { typeMap } from './developmentTypes';
 import { RESIDENTIAL_TYPES } from './residentialTypes';
+import { getDevelopmentCategory } from './developmentTypes';
 
 // Constants for application status colors
 const STATUS_COLORS = {
@@ -164,37 +165,41 @@ export const isResidentialType = (type) => {
 };
 
 /**
- * Transforms development types into a standardized form
+ * Transforms development types into a standardised form, preferring primary types.
  */
 export const getTransformedDevelopmentType = (developmentTypes) => {
   if (!developmentTypes || developmentTypes.length === 0) {
     return 'Unknown';
   }
-  
-  // Find the first valid development type
-  const firstType = developmentTypes.find(t => t.DevelopmentType);
-  
-  if (!firstType) {
+
+  // Try to find a primary type (not secondary)
+  const primaryTypeObj = developmentTypes.find(t => {
+    if (!t.DevelopmentType) return false;
+    if (typeMap.has(t.DevelopmentType)) {
+      const mapped = typeMap.get(t.DevelopmentType);
+      return !mapped.secondary;
+    }
+    // If not in typeMap, treat as primary
+    return true;
+  });
+
+  // If no primary type, fall back to first valid type (could be secondary)
+  const typeObj = primaryTypeObj || developmentTypes.find(t => t.DevelopmentType);
+  if (!typeObj) {
     return 'Unknown';
   }
-  
-  const rawType = firstType.DevelopmentType;
-  
+  const rawType = typeObj.DevelopmentType;
+
   // Use the typeMap to transform the development type
   if (typeMap.has(rawType)) {
     const mappedType = typeMap.get(rawType);
-    // Return the newtype if it's not an empty string
     if (mappedType.newtype) {
       return mappedType.newtype;
     }
-    // If it's a secondary structure, mark it as such
     if (mappedType.secondary) {
-      // Return type with indication it's a secondary structure
       return `${rawType} (secondary)`;
     }
   }
-  
-  // If no mapping is found, return the original type
   return rawType;
 };
 
@@ -227,10 +232,17 @@ export const createDevelopmentLayer = async (
   const dedupedApplications = deduplicateApplications(applications);
   console.log(`Deduplication removed ${applications.length - dedupedApplications.length} duplicate entries`);
   
-  // Categorize applications - simplified version without lensConfig dependency
+  // Categorize applications - assign category using getDevelopmentCategory
   const categorizedApplications = dedupedApplications.map(app => {
-    // Copy the application to avoid mutating the original
-    return { ...app, Category: 'Miscellaneous and Administrative' };
+    // Try to use existing category, otherwise derive from development type
+    let category = app.Category;
+    if (!category) {
+      // Use the first valid development type for category assignment
+      const devTypeObj = app.DevelopmentType && app.DevelopmentType.length > 0 ? app.DevelopmentType[0] : null;
+      const devType = devTypeObj && devTypeObj.DevelopmentType ? devTypeObj.DevelopmentType : null;
+      category = devType ? getDevelopmentCategory(devType) : 'Miscellaneous and Administrative';
+    }
+    return { ...app, Category: category };
   });
   
   // Create GeoJSON features with careful error handling
