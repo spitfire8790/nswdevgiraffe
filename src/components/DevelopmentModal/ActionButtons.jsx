@@ -34,6 +34,17 @@ const ActionButtons = ({
     <div className="flex flex-col items-start gap-2">
       <div className="flex items-center gap-2">
         <button
+          onClick={handleGenerateCSV}
+          disabled={!developmentData.length}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium 
+            ${!developmentData.length 
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+              : 'bg-green-600 text-white hover:bg-green-700'}`}
+        >
+          <FileDown size={14} />
+          <span>Download CSV</span>
+        </button>
+        <button
           onClick={handleCreateGeoJSONLayer}
           disabled={isGeneratingLayer || !developmentData.length}
           className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium 
@@ -59,29 +70,6 @@ const ActionButtons = ({
         </button>
         {/* Add Parcel Layer Button */}
         <AddParcelLayerButton {...parcelLayerProps} />
-        <button
-          onClick={handleGenerateCSV}
-          disabled={!developmentData.length}
-          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium 
-            ${!developmentData.length 
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-              : 'bg-green-600 text-white hover:bg-green-700'}`}
-        >
-          <FileDown size={14} />
-          <span>Download CSV</span>
-        </button>
-
-        <button
-          onClick={handleGenerateJSON}
-          disabled={!developmentData.length}
-          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium 
-            ${!developmentData.length 
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-              : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-        >
-          <FileDown size={14} />
-          <span>Download JSON</span>
-        </button>
       </div>
       {/* Parcel Layer Progress Bar */}
       {parcelBatchProgress && parcelBatchProgress.total > 0 && (

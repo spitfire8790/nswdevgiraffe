@@ -17,9 +17,10 @@ import { getDevelopmentCategory } from './developmentTypes';
  * @param {Function} params.setTotalFeatures - Setter for total features (progress)
  * @param {Function} params.setProcessedFeatures - Setter for processed features (progress)
  * @param {Function} params.setParcelBatchProgress - Setter for parcel batch progress
+ * @param {Object} params.floorHeightsByCategory - Object containing floor heights for each category
  * @returns {Promise<string|null>} The layer name if successful, or null
  */
-export async function createParcelLayer({ applications, selectedFeatures, setParcelLayer, setError, setTotalFeatures, setProcessedFeatures, setParcelBatchProgress }) {
+export async function createParcelLayer({ applications, selectedFeatures, setParcelLayer, setError, setTotalFeatures, setProcessedFeatures, setParcelBatchProgress, floorHeightsByCategory = {} }) {
   if (!applications || !Array.isArray(applications) || applications.length === 0) {
     setError('No applications to display parcels for.');
     return null;
@@ -92,7 +93,11 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
           const devType = devTypeObj && devTypeObj.DevelopmentType ? devTypeObj.DevelopmentType : null;
           return devType ? getDevelopmentCategory(devType) : 'Miscellaneous and Administrative';
         })(),
-        "Estimated Height": (da.NumberOfStoreys && !isNaN(da.NumberOfStoreys)) ? da.NumberOfStoreys * 3 : 0
+        "Estimated Height": (() => {
+          const category = (da.Category) ? da.Category : (da.DevelopmentType && da.DevelopmentType.length > 0 && da.DevelopmentType[0].DevelopmentType ? getDevelopmentCategory(da.DevelopmentType[0].DevelopmentType) : 'Miscellaneous and Administrative');
+          const floorHeight = floorHeightsByCategory[category] || 3;
+          return (da.NumberOfStoreys && !isNaN(da.NumberOfStoreys)) ? da.NumberOfStoreys * floorHeight : 0;
+        })()
       } : feature.properties
     };
   });
@@ -115,7 +120,6 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
           ...parcelFeature,
           properties: {
             id: da.ApplicationId,
-            title: da.DevelopmentDescription || 'Unknown',
             status: da.ApplicationStatus || 'Unknown',
             isResidential: da.DevelopmentType?.some(type =>
               (type && type.DevelopmentType && RESIDENTIAL_TYPES.has(type.DevelopmentType))
@@ -143,7 +147,11 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
               const devType = devTypeObj && devTypeObj.DevelopmentType ? devTypeObj.DevelopmentType : null;
               return devType ? getDevelopmentCategory(devType) : 'Miscellaneous and Administrative';
             })(),
-            "Estimated Height": (da.NumberOfStoreys && !isNaN(da.NumberOfStoreys)) ? da.NumberOfStoreys * 3 : 0
+            "Estimated Height": (() => {
+              const category = (da.Category) ? da.Category : (da.DevelopmentType && da.DevelopmentType.length > 0 && da.DevelopmentType[0].DevelopmentType ? getDevelopmentCategory(da.DevelopmentType[0].DevelopmentType) : 'Miscellaneous and Administrative');
+              const floorHeight = floorHeightsByCategory[category] || 3;
+              return (da.NumberOfStoreys && !isNaN(da.NumberOfStoreys)) ? da.NumberOfStoreys * floorHeight : 0;
+            })()
           }
         });
       } else {
@@ -248,23 +256,23 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
 
 // Add Lucide-inspired category colour palette
 const CATEGORY_COLORS = {
-  'Residential Types': { fillColour: '#4F8A8B', outlineColour: '#16697A' },
+  'Residential Types': { fillColour: '#FF483B', outlineColour: '#C13A2E' },
   'Alterations and Modifications': { fillColour: '#9333ea', outlineColour: '#6D28D9' },
-  'Commercial and Business': { fillColour: '#F9C846', outlineColour: '#F98404' },
+  'Commercial and Business': { fillColour: '#04aae5', outlineColour: '#0377a8' },
   'Food and Beverage': { fillColour: '#ea580c', outlineColour: '#b45309' },
   'Education and Childcare': { fillColour: '#16a34a', outlineColour: '#166534' },
   'Health and Medical': { fillColour: '#ef4444', outlineColour: '#991b1b' },
   'Recreation and Entertainment': { fillColour: '#4daf4a', outlineColour: '#166534' },
   'Tourism and Accommodation': { fillColour: '#f59e0b', outlineColour: '#b45309' },
-  'Industrial and Warehousing': { fillColour: '#A28089', outlineColour: '#624763' },
+  'Industrial and Warehousing': { fillColour: '#64748b', outlineColour: '#374151' },
   'Transport and Vehicle Related': { fillColour: '#0891b2', outlineColour: '#0e7490' },
   'Marine and Water Related': { fillColour: '#0ea5e9', outlineColour: '#0369a1' },
-  'Infrastructure and Utilities': { fillColour: '#B2B1B9', outlineColour: '#6E7B8B' },
+  'Infrastructure and Utilities': { fillColour: '#475569', outlineColour: '#1e293b' },
   'Subdivision and Land Development': { fillColour: '#330000', outlineColour: '#7c2d12' },
-  'Mixed Use and Other Development Types': { fillColour: '#43BCCD', outlineColour: '#1B4965' },
+  'Mixed Use and Other Development Types': { fillColour: '#7c3aed', outlineColour: '#4c1d95' },
   'Home Business and Occupation': { fillColour: '#0d9488', outlineColour: '#134e4a' },
   'Secondary Structures and Modifications': { fillColour: '#737373', outlineColour: '#525252' },
-  'Miscellaneous and Administrative': { fillColour: '#B8B8FF', outlineColour: '#5F5F9F' },
+  'Miscellaneous and Administrative': { fillColour: '#525252', outlineColour: '#262626' },
   'Agriculture': { fillColour: '#166534', outlineColour: '#065f46' },
   'Mining and Resource Extraction': { fillColour: '#78350f', outlineColour: '#92400e' },
   'Other': { fillColour: '#CCCCCC', outlineColour: '#888888' },
