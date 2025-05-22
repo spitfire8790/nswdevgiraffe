@@ -33,6 +33,7 @@ import {
   removeAllTempLayers
 } from '../../services/lgaMapService';
 import { track } from '@vercel/analytics'
+import AddParcelLayerButton from './AddParcelLayerButton';
 
 const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = false }) => {
   const [developmentData, setDevelopmentData] = useState([]);
@@ -92,6 +93,12 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
     if (filters.lodgedDate.operator) count++;
     return count;
   }, [filters]);
+
+  // State for parcel layer
+  const [parcelLayer, setParcelLayer] = useState(null);
+
+  // State for parcelBatchProgress
+  const [parcelBatchProgress, setParcelBatchProgress] = useState({ current: 0, total: 0 });
 
   // Function to fetch development application data
   const fetchDevelopmentData = async (lgaNameToFetch) => {
@@ -859,6 +866,25 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
 
   const [showInfoModal, setShowInfoModal] = useState(false);
 
+  const parcelLayerProps = {
+    applications: developmentData,
+    selectedFeatures: [
+      {
+        type: 'Feature',
+        properties: {
+          copiedFrom: {
+            site_suitability__LGA: selectedLga
+          }
+        }
+      }
+    ],
+    setParcelLayer,
+    setError,
+    setTotalFeatures,
+    setProcessedFeatures,
+    setParcelBatchProgress
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -894,6 +920,8 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                 processedFeatures={processedFeatures}
                 totalFeatures={totalFeatures}
                 hasLoadedData={hasLoadedData}
+                parcelLayerProps={parcelLayerProps}
+                parcelBatchProgress={parcelBatchProgress}
               />
             </div>
 
