@@ -21,24 +21,80 @@ import { getDevelopmentCategory } from './developmentTypes';
  * @returns {Promise<string|null>} The layer name if successful, or null
  */
 export async function createParcelLayer({ applications, selectedFeatures, setParcelLayer, setError, setTotalFeatures, setProcessedFeatures, setParcelBatchProgress, floorHeightsByCategory = {} }) {
+  console.log('[Parcel Layer] Starting parcel layer creation process');
+  console.log(`[Parcel Layer] Input applications count: ${applications?.length || 0}`);
+  
   if (!applications || !Array.isArray(applications) || applications.length === 0) {
+    console.error('[Parcel Layer] No applications provided or empty array');
     setError('No applications to display parcels for.');
     return null;
   }
 
+  // Log application structure for debugging
+  console.log('[Parcel Layer] Sample application structure (first app):', {
+    ApplicationId: applications[0]?.ApplicationId,
+    Location: applications[0]?.Location,
+    LotCount: applications[0]?.Location?.[0]?.Lot?.length || 0,
+    hasValidLocation: !!(applications[0]?.Location?.[0]?.Lot?.length > 0)
+  });
+
   // 1. Extract all unique lotidstrings and build a map from lotidstring to primary DA
+  console.log('[Parcel Layer] Step 1: Extracting lot ID strings from applications');
   const lotToPrimaryDA = {};
-  applications.forEach(app => {
-    (app.Location?.[0]?.Lot || []).forEach(lot => {
+  let totalLotsProcessed = 0;
+  let applicationsWithLots = 0;
+  let applicationsWithoutLots = 0;
+
+  applications.forEach((app, index) => {
+    const lots = app.Location?.[0]?.Lot || [];
+    if (lots.length === 0) {
+      applicationsWithoutLots++;
+      console.warn(`[Parcel Layer] Application ${app.ApplicationId || index} has no lots`);
+    } else {
+      applicationsWithLots++;
+    }
+    
+    lots.forEach(lot => {
+      totalLotsProcessed++;
       const lotidstring = `${lot.Lot}//${lot.PlanLabel}`;
+      
+      // Validate lot data
+      if (!lot.Lot || !lot.PlanLabel) {
+        console.warn(`[Parcel Layer] Invalid lot data in application ${app.ApplicationId}:`, lot);
+        return;
+      }
+      
       if (!lotToPrimaryDA[lotidstring]) {
         lotToPrimaryDA[lotidstring] = app;
+      } else {
+        console.log(`[Parcel Layer] Duplicate lot ID string found: ${lotidstring} (already assigned to ${lotToPrimaryDA[lotidstring].ApplicationId})`);
       }
     });
   });
+
+  console.log(`[Parcel Layer] Lot extraction summary:`);
+  console.log(`  - Applications with lots: ${applicationsWithLots}`);
+  console.log(`  - Applications without lots: ${applicationsWithoutLots}`);
+  console.log(`  - Total lots processed: ${totalLotsProcessed}`);
+  console.log(`  - Unique lot ID strings: ${Object.keys(lotToPrimaryDA).length}`);
+
   const lotIdStrings = Array.from(new Set(Object.keys(lotToPrimaryDA)));
+  
+  // Log sample lot ID strings for validation
+  console.log(`[Parcel Layer] Sample lot ID strings (first 10):`, lotIdStrings.slice(0, 10));
+  
+  // Validate lot ID string format
+  const invalidLotIds = lotIdStrings.filter(lotId => {
+    const parts = lotId.split('//');
+    return parts.length !== 2 || !parts[0] || !parts[1];
+  });
+  
+  if (invalidLotIds.length > 0) {
+    console.warn(`[Parcel Layer] Found ${invalidLotIds.length} invalid lot ID string formats:`, invalidLotIds.slice(0, 5));
+  }
 
   if (lotIdStrings.length === 0) {
+    console.error('[Parcel Layer] No valid lot references found in applications');
     setError('No lot references found in applications.');
     return null;
   }
@@ -47,17 +103,31 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
   if (setProcessedFeatures) setProcessedFeatures(0);
 
   // 2. Query ArcGIS for all polygons by lotidstring
+  console.log('[Parcel Layer] Step 2: Querying ArcGIS for parcel polygons');
+  console.log(`[Parcel Layer] About to call fetchParcelsByLotIdStrings with ${lotIdStrings.length} lot ID strings`);
+  
   let featureCollection;
   try {
     featureCollection = await fetchParcelsByLotIdStrings(lotIdStrings, setParcelBatchProgress ? (current, total) => setParcelBatchProgress({ current, total }) : undefined);
+    console.log(`[Parcel Layer] ArcGIS query completed. Received ${featureCollection?.features?.length || 0} features`);
     if (setProcessedFeatures) setProcessedFeatures(lotIdStrings.length);
   } catch (err) {
+    console.error('[Parcel Layer] Error during ArcGIS fetch:', err);
+    console.error('[Parcel Layer] Error details:', {
+      message: err.message,
+      stack: err.stack,
+      lotIdStringCount: lotIdStrings.length
+    });
     setError('Error fetching parcel polygons.');
     return null;
   }
 
+  console.log('[Parcel Layer] Step 3: Processing parcel features and attaching DA properties');
+  
   // 3. Attach DA properties to each polygon feature (lotidstring match)
   const foundLotidstrings = new Set(featureCollection.features.map(f => f.properties?.lotidstring));
+  console.log(`[Parcel Layer] Found polygons for ${foundLotidstrings.size} unique lot ID strings out of ${lotIdStrings.length} requested`);
+  
   let featuresWithDAProps = featureCollection.features.map(feature => {
     const lotidstring = feature.properties?.lotidstring;
     const da = lotToPrimaryDA[lotidstring];
@@ -65,13 +135,11 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
       ...feature,
       properties: da ? {
         id: da.ApplicationId,
-        title: da.DevelopmentDescription || 'Unknown',
         status: da.ApplicationStatus || 'Unknown',
         isResidential: da.DevelopmentType?.some(type =>
           (type && type.DevelopmentType && RESIDENTIAL_TYPES.has(type.DevelopmentType))
         ) || false,
         lodgedDate: da.LodgementDate,
-        description: da.DevelopmentDescription || 'No description available',
         developmentType: da.DevelopmentType ? getTransformedDevelopmentType(da.DevelopmentType) : 'Unknown',
         "Clean Development Type": da.DevelopmentType ? getTransformedDevelopmentType(da.DevelopmentType) : 'Unknown',
         "Detailed Development Type": da.DevelopmentType ? da.DevelopmentType.map(dt => dt.DevelopmentType).join('; ') : '',
@@ -108,6 +176,10 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
     if (lots.length === 0) return true; // No lots, always fallback
     return lots.some(lot => !foundLotidstrings.has(`${lot.Lot}//${lot.PlanLabel}`));
   });
+  
+  console.log(`[Parcel Layer] Step 4: Spatial fallback processing`);
+  console.log(`[Parcel Layer] Applications requiring spatial fallback: ${missingLotDAs.length}`);
+  
   for (const da of missingLotDAs) {
     const x = parseFloat(da.Location?.[0]?.X);
     const y = parseFloat(da.Location?.[0]?.Y);
@@ -158,10 +230,12 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
         console.warn(`[Parcel Fallback] No parcel found for DA ${da.ApplicationId} at (${x}, ${y})`);
       }
     } else {
-      console.warn(`[Parcel Fallback] Invalid coordinates for DA ${da.ApplicationId}`);
+      console.warn(`[Parcel Fallback] Invalid coordinates for DA ${da.ApplicationId}: X=${da.Location?.[0]?.X}, Y=${da.Location?.[0]?.Y}`);
     }
   }
 
+  console.log(`[Parcel Layer] Step 5: Grouping and dissolving features by PAN`);
+  
   // 5. Group features by PAN and dissolve polygons per PAN
   const panToFeatures = {};
   for (const feature of featuresWithDAProps) {
@@ -169,6 +243,10 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
     if (!panToFeatures[pan]) panToFeatures[pan] = [];
     panToFeatures[pan].push(feature);
   }
+
+  console.log(`[Parcel Layer] PAN grouping summary:`);
+  console.log(`  - Unique PANs: ${Object.keys(panToFeatures).length}`);
+  console.log(`  - PANs with multiple features: ${Object.entries(panToFeatures).filter(([pan, features]) => features.length > 1).length}`);
 
   const finalFeatures = [];
   for (const [pan, features] of Object.entries(panToFeatures)) {
@@ -194,12 +272,19 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
     });
   }
 
+  console.log(`[Parcel Layer] Final feature processing summary:`);
+  console.log(`  - Final features created: ${finalFeatures.length}`);
+  console.log(`  - Categories represented:`, [...new Set(finalFeatures.map(f => f.properties.Category))]);
+
   // 6. Fallback to DA points if no polygons
   if (!finalFeatures.length) {
+    console.error('[Parcel Layer] No final features created - falling back to DA points');
     setError('No parcel polygons found. Falling back to DA points.');
     return null;
   }
 
+  console.log('[Parcel Layer] Step 6: Creating map layer');
+  
   // 7. Add a single layer named DA - PARCELS - {LGA} - {DATE}
   let councilName = 'Unknown';
   if (selectedFeatures && selectedFeatures.length > 0) {
@@ -213,6 +298,8 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
   const year = currentDate.getFullYear();
   const formattedDate = `${day} ${month} ${year}`;
   const layerName = `DA - PARCELS - ${councilName} - ${formattedDate}`;
+  
+  console.log(`[Parcel Layer] Creating layer: ${layerName}`);
   setParcelLayer(layerName);
 
   // Prepare GeoJSON FeatureCollection for the layer
@@ -223,9 +310,12 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
 
   // Validate
   if (!validateGeoJSON(layerFeatureCollection, true)) {
+    console.error('[Parcel Layer] GeoJSON validation failed');
     setError('Error creating parcel layer: Feature collection validation failed');
     return null;
   }
+
+  console.log('[Parcel Layer] GeoJSON validation passed');
 
   // Style: bold outline, semi-transparent fill
   const layerStyle = {
@@ -238,6 +328,7 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
   };
 
   try {
+    console.log('[Parcel Layer] Adding layer to map via RPC');
     await rpc.invoke('createGeoJSONLayer', [
       layerName,
       layerFeatureCollection,
@@ -246,9 +337,11 @@ export async function createParcelLayer({ applications, selectedFeatures, setPar
         style: layerStyle
       }
     ]);
+    console.log(`[Parcel Layer] Successfully created layer: ${layerName}`);
     if (setProcessedFeatures) setProcessedFeatures(lotIdStrings.length);
     return layerName;
   } catch (err) {
+    console.error('[Parcel Layer] Error adding layer to map:', err);
     setError('Error adding parcel layer to map.');
     return null;
   }
