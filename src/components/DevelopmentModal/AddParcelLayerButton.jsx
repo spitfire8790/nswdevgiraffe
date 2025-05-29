@@ -119,12 +119,13 @@ function FloorHeightModal({ isOpen, onClose, heights, setHeights }) {
  * Button to add a parcel layer for the current DAs.
  * Sits next to the 'Create Layer' button in the UI.
  * @param {Object} props
- * @param {Array} props.applications - Array of DA objects
+ * @param {Array} props.applications - Array of DA objects (filtered)
  * @param {Array} props.selectedFeatures - Array of selected map features (for LGA)
  * @param {Function} props.setParcelLayer - Setter for the new layer name
  * @param {Function} props.setError - Setter for error messages
  * @param {Function} props.setTotalFeatures - Setter for total features (progress)
  * @param {Function} props.setProcessedFeatures - Setter for processed features (progress)
+ * @param {number} props.filteredCount - Count of filtered applications for display
  */
 export default function AddParcelLayerButton({
   applications,
@@ -132,7 +133,8 @@ export default function AddParcelLayerButton({
   setParcelLayer,
   setError,
   setTotalFeatures,
-  setProcessedFeatures
+  setProcessedFeatures,
+  filteredCount
 }) {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -155,6 +157,8 @@ export default function AddParcelLayerButton({
       setLoading(false);
     }
   };
+
+  const displayCount = filteredCount !== undefined ? filteredCount : (applications?.length || 0);
 
   return (
     <div className="flex items-center gap-2">
@@ -183,7 +187,7 @@ export default function AddParcelLayerButton({
           type="button"
           className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700"
           onClick={handleAddParcelLayer}
-          disabled={loading}
+          disabled={loading || displayCount === 0}
         >
           {loading ? (
             <>
@@ -193,7 +197,7 @@ export default function AddParcelLayerButton({
           ) : (
             <>
               <Layers size={18} />
-              <span>Add Parcel Layer</span>
+              <span>Add Parcel Layer ({displayCount})</span>
             </>
           )}
         </button>

@@ -9,7 +9,8 @@ import AddParcelLayerButton from './AddParcelLayerButton';
  * @param {function} props.handleGenerateCSV - Handler for CSV download
  * @param {function} props.handleGenerateJSON - Handler for JSON download
  * @param {boolean} props.isGeneratingLayer - Loading state for Create Layer
- * @param {Array} props.developmentData - DA data for the layer
+ * @param {Array} props.developmentData - Full DA dataset
+ * @param {Array} props.filteredData - Filtered DA data (what will actually be used)
  * @param {number} props.processedFeatures - Progress for Create Layer
  * @param {number} props.totalFeatures - Progress for Create Layer
  * @param {boolean} props.hasLoadedData - Whether data is loaded
@@ -22,6 +23,7 @@ const ActionButtons = ({
   handleGenerateJSON,
   isGeneratingLayer,
   developmentData, 
+  filteredData,
   processedFeatures, 
   totalFeatures,
   hasLoadedData,
@@ -30,25 +32,40 @@ const ActionButtons = ({
 }) => {
   if (!hasLoadedData) return null;
   
+  // Use filtered data count for display and enable/disable logic
+  const dataCount = filteredData?.length || 0;
+  const hasData = dataCount > 0;
+  
   return (
     <div className="flex flex-col items-start gap-2">
       <div className="flex items-center gap-2">
         <button
           onClick={handleGenerateCSV}
-          disabled={!developmentData.length}
+          disabled={!hasData}
           className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium 
-            ${!developmentData.length 
+            ${!hasData 
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
               : 'bg-green-600 text-white hover:bg-green-700'}`}
         >
           <FileDown size={14} />
-          <span>Download CSV</span>
+          <span>Download CSV ({dataCount})</span>
+        </button>
+        <button
+          onClick={handleGenerateJSON}
+          disabled={!hasData}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium 
+            ${!hasData 
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+              : 'bg-purple-600 text-white hover:bg-purple-700'}`}
+        >
+          <FileJson size={14} />
+          <span>Download JSON ({dataCount})</span>
         </button>
         <button
           onClick={handleCreateGeoJSONLayer}
-          disabled={isGeneratingLayer || !developmentData.length}
+          disabled={isGeneratingLayer || !hasData}
           className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium 
-            ${isGeneratingLayer || !developmentData.length 
+            ${isGeneratingLayer || !hasData 
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
               : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
         >
@@ -64,12 +81,12 @@ const ActionButtons = ({
           ) : (
             <>
               <Layers size={14} />
-              <span>Create Layer</span>
+              <span>Create Layer ({dataCount})</span>
             </>
           )}
         </button>
         {/* Add Parcel Layer Button */}
-        <AddParcelLayerButton {...parcelLayerProps} />
+        <AddParcelLayerButton {...parcelLayerProps} filteredCount={dataCount} />
       </div>
       {/* Parcel Layer Progress Bar */}
       {parcelBatchProgress && parcelBatchProgress.total > 0 && (

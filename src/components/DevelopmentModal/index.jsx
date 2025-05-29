@@ -25,6 +25,7 @@ import SummaryStats from './SummaryStats';
 import DevCharts from './DevCharts';
 import DevelopmentTable from './DevelopmentTable';
 import ActionButtons from './ActionButtons';
+import EnhancedLandingPage from './components/EnhancedLandingPage';
 import { 
   displayLgaBoundary, 
   removeLgaBoundaryLayer,
@@ -650,10 +651,13 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
         }
       };
       
+      // Use filtered applications instead of entire dataset
+      const filteredApplications = getFilteredApplications();
+      
       // Note: This creates a permanent layer, but we don't remove the temporary layers
       // as they should persist until the user changes LGA or closes the modal
       await createDevelopmentLayer(
-        developmentData,
+        filteredApplications, // Changed from developmentData to filtered data
         [mockFeature], // Pass the mock feature based on selected LGA
         setDevelopmentLayer,
         setError,
@@ -867,7 +871,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
   const [showInfoModal, setShowInfoModal] = useState(false);
 
   const parcelLayerProps = {
-    applications: developmentData,
+    applications: getFilteredApplications(), // Changed from developmentData to filtered data
     selectedFeatures: [
       {
         type: 'Feature',
@@ -917,6 +921,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                 handleGenerateJSON={handleGenerateJSON}
                 isGeneratingLayer={isGeneratingLayer}
                 developmentData={developmentData}
+                filteredData={getFilteredApplications()}
                 processedFeatures={processedFeatures}
                 totalFeatures={totalFeatures}
                 hasLoadedData={hasLoadedData}
@@ -979,26 +984,7 @@ const DevelopmentModal = ({ isOpen, onClose, selectedFeatures, fullscreen = fals
                 </div>
               </div>
             ) : !hasLoadedData ? (
-              <div className="flex items-center justify-center py-20 bg-gradient-to-b from-white to-gray-50">
-                <div className="w-full max-w-3xl mx-auto px-6 py-12">
-                  <div className="text-center mb-8">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-3">NSW Development Applications</h2>
-                    <p className="text-gray-600 max-w-lg mx-auto">
-                      Access and analyse development applications across New South Wales. Select a Local Government Area to begin.
-                    </p>
-                  </div>
-                  
-                  <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm mb-8">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-3">{tooltipContent.deduplicationInfo.title}</h3>
-                    <div className="text-sm text-gray-600 whitespace-pre-line">
-                      {tooltipContent.deduplicationInfo.content}
-                    </div>
-                    <div className="mt-3 text-xs text-gray-500">
-                      {tooltipContent.deduplicationInfo.source} - <a href={tooltipContent.deduplicationInfo.sourceLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View source</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <EnhancedLandingPage tooltipContent={tooltipContent} />
             ) : (
               <div className="flex flex-col">
                 {/* FilterBar Component */}
