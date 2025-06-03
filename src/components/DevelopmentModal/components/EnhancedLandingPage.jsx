@@ -77,7 +77,7 @@ const EnhancedLandingPage = ({ tooltipContent }) => {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="text-center mb-16"
+          className="text-center mb-8"
         >
           {/* Animated Logo */}
           <motion.div
@@ -96,7 +96,7 @@ const EnhancedLandingPage = ({ tooltipContent }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-6xl md:text-7xl font-bold mb-6"
+            className="text-4xl md:text-5xl font-bold mb-6"
           >
             <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent animate-gradient-shift bg-[length:200%_200%]">
               NSW Development
@@ -110,7 +110,7 @@ const EnhancedLandingPage = ({ tooltipContent }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
-            className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-12 leading-relaxed"
+            className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-6 leading-relaxed"
           >
             Select a Local Government Area above to begin. 
           </motion.p>

@@ -4,7 +4,7 @@ import { getAllLgas, formatLgaName } from '../utils/councilLgaMapping';
 // Get all LGAs with display and value properties
 const autocompleteOptions = getAllLgas();
 
-const Autocomplete = ({ value, onChange, placeholder }) => {
+const Autocomplete = ({ value, onChange, placeholder, onDropdownStateChange }) => {
   const [inputValue, setInputValue] = useState('');
   const [filteredOptions, setFilteredOptions] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -40,6 +40,7 @@ const Autocomplete = ({ value, onChange, placeholder }) => {
     }
     
     setIsOpen(true);
+    if (onDropdownStateChange) onDropdownStateChange(true);
     setHighlightedIndex(-1);
   };
 
@@ -48,6 +49,7 @@ const Autocomplete = ({ value, onChange, placeholder }) => {
     setInputValue(option.display);
     onChange(option.value); // Pass the original value to parent
     setIsOpen(false);
+    if (onDropdownStateChange) onDropdownStateChange(false);
     setFilteredOptions([]);
   };
 
@@ -66,6 +68,7 @@ const Autocomplete = ({ value, onChange, placeholder }) => {
       handleSelectOption(filteredOptions[highlightedIndex]);
     } else if (e.key === 'Escape') {
       setIsOpen(false);
+      if (onDropdownStateChange) onDropdownStateChange(false);
     }
   };
 
@@ -78,12 +81,13 @@ const Autocomplete = ({ value, onChange, placeholder }) => {
         !inputRef.current.contains(e.target)
       ) {
         setIsOpen(false);
+        if (onDropdownStateChange) onDropdownStateChange(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [onDropdownStateChange]);
 
   // Scroll to highlighted option
   useEffect(() => {
@@ -103,7 +107,12 @@ const Autocomplete = ({ value, onChange, placeholder }) => {
         value={inputValue}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        onFocus={() => inputValue && setIsOpen(true)}
+        onFocus={() => {
+          if (inputValue) {
+            setIsOpen(true);
+            if (onDropdownStateChange) onDropdownStateChange(true);
+          }
+        }}
         placeholder={placeholder}
         className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
         aria-label="LGA name"

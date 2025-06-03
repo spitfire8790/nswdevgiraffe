@@ -16,6 +16,20 @@ const LGASelector = ({
   activeFilterCard,
   setActiveFilterCard
 }) => {
+  // Track whether the Autocomplete dropdown is open
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = React.useState(false);
+
+  // Handle when dropdown needs to be opened by chevron
+  const handleDropdownToggle = () => {
+    // If autocomplete dropdown is open, we don't want to also open the custom dropdown
+    if (isAutocompleteOpen) {
+      setIsAutocompleteOpen(false);
+      return;
+    }
+    
+    setActiveFilterCard(activeFilterCard === 'lgaDropdown' ? null : 'lgaDropdown');
+  };
+
   return (
     <div className="px-4 py-3 bg-gray-50 border-b flex items-center sticky top-[73px] z-10">
       <div className="flex-1 flex items-center gap-3 flex-wrap">
@@ -29,12 +43,19 @@ const LGASelector = ({
                 setValidationError(''); // Clear error when selection changes
               }}
               placeholder="Search or select an LGA..."
+              onDropdownStateChange={(isOpen) => {
+                setIsAutocompleteOpen(isOpen);
+                // If autocomplete opens, close the custom dropdown
+                if (isOpen && activeFilterCard === 'lgaDropdown') {
+                  setActiveFilterCard(null);
+                }
+              }}
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-2">
               <button
                 type="button"
                 className="text-gray-400 hover:text-gray-600 focus:outline-none"
-                onClick={() => setActiveFilterCard(activeFilterCard === 'lgaDropdown' ? null : 'lgaDropdown')}
+                onClick={handleDropdownToggle}
                 aria-label="Open LGA dropdown"
               >
                 <ChevronDown className="h-5 w-5" />
